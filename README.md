@@ -1,18 +1,34 @@
 # armor
 
- Rough drafts of the ARMOR contracts (rough as in not compile-able).
+Rough drafts of the ARMOR contracts (rough as in not compile-able).
+
+Taek:
+
+1. Contracts are all over the place because of rough changes made on one and not others. For example, StakeManager has references to the userCoverCost variable which is now on RewardManager. This also include yNft and NXM contract interactions, which have some pseudo-code. Hell, imports probably aren’t right.
 
 
-They here are some big things wrong with these and I bet plenty of small ones:
+2. I believe the biggest actual addition is using Eth and Dai. We can talk about this more later but we need to get Dai price from a feed (MakerDAO, nxm, etc.--probably best to do Nexus Mutual now that I think about it even though I threw in a MakerDAO variable), then convert both Eth and Dai coverage costs into dai per second cost. The protocol strategy is setup for this I believe, but figuring out which yNFTs are Eth and Dai depend on the contract they’re coming from.
 
 
-1. Some constructors require each other.
-
-2. Using getNFT in LendManager but the function doesn’t exist, need to change how we get those parameters by grabbing one at a time. All variables using it are right, but we need to get separately.
-
-3. Some function calls to NexusMutual are not correct.
-
-4. General cleanliness, comments, etc.
+3. Lots of random compiler and math bugs I’m sure—have just been putting the core of everything together and not attempting to make it work. Testing after that of course.
 
 
-I’m just uploading now to show the general strategies we’re working with, see what other people think, if we should go different directions, etc. Feel free to make any changes, but I’ll be on tomorrow to fix those things above, go over everything again to get some more of the smaller things, and make any protocol changes we need.
+4. Implementation of your linked list strategy (and removing anything else that can be removed because of that).
+
+
+5. Cleaning up, SafeMath, lots of packing can be done, etc.
+
+
+6. Fix anything else you can improve.
+
+
+7. Add auto-remove to most contracts instead of just staker.
+
+
+8. Full system architecture. I threw in a quick directory contract but I’m not sure exactly how it should work in a simple and efficient way. Maybe a directory and initialize to save most recent addresses? Maybe every call calls directory for the address then calls that contract? Dunno.
+
+
+9. Proxies, farming, all that extra stuff.
+
+
+I’m sure you’ll have a lot of questions while deciphering this cause it’s a bit all over the place so ask away.
