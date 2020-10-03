@@ -16,10 +16,6 @@ contract ClaimManager is Ownable {
     
     IERC20 public daiContract;
 
-    /**
-     * @notice Add all yNFT contracts
-    **/
-
     // Mapping of hacks that we have confirmed to have happened. (keccak256(protocol ID, timestamp) => didithappen).
     mapping (bytes32 => bool) confirmedHacks;
     
@@ -46,15 +42,15 @@ contract ClaimManager is Ownable {
      *      Do we want this to be callable by anyone or only the person requesting?
      * @param _amount The amount being requested in the claim.
      * @param _hackTime The given timestamp for when the hack occurred.
+     * @notice Make sure this cannot be done twice. I also think this protocol interaction can be simplified.
     **/
-    function redeemClaim(address _protocol, bytes4 _coverCurrency, uint256 _hackTime)
+    function redeemClaim(address _protocolAddress, bytes4 _coverCurrency, uint256 _hackTime)
       external
     {
-        bytes32 hackId = keccak256(_protocol, _hackTime);
-        require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
+        bytes32 protocol = keccak256(_protocolAddress, _coverCurrency);
         
-        // Protocol encoded to include cover currency.
-        bytes32 protocol = keccak256(_protocol, _coverCurrency);
+        bytes32 hackId = keccak256(protocol, _hackTime);
+        require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         
         // Gets the coverage amount of the user at the time the hack happened.
         uint256 coverage = PlanManager.checkCoverage(msg.sender, protocol, _hackTime);
@@ -77,8 +73,9 @@ contract ClaimManager is Ownable {
      * @param _nftId ID of the NFT to submit.
      * @param _protocol Address of the protocol the hack occurred on.
      * @param _hackTime The timestamp of the hack that occurred.
+     * @notice I think this _protocol/_protocolAddress use can be simplified.
     **/
-    function submitNft(uint256 _nftId, address _protocol, uint256 _hackTime)
+    function submitNft(uint256 _nftId, bytes32 _protocol, address _protocolAddress, uint256 _hackTime)
       external
     {
         bytes32 hackId = keccak256(_protocol, _hackTime);
@@ -87,7 +84,10 @@ contract ClaimManager is Ownable {
         // require ynft has not been claimed
         Token memory token = ynftContract.getToken(_nftId);
         
+        // Make sure yNFT was not expired.
+        
         // require ynft matches the protocol
+        
         /**
          * @notice I don't think you can get protocol from the yNFT contracts, only NXM.
         **/
@@ -114,7 +114,7 @@ contract ClaimManager is Ownable {
      * @param _protocol The address of the protocol that has been hacked (address that would be on yNFT).
      * @param _hackTime The timestamp of the time the hack occurred.
     **/
-    function confirmHack(address _protocol, uint256 _hackTime)
+    function confirmHack(bytes32 _protocol, uint256 _hackTime)
       external
       onlyOwner
     {
