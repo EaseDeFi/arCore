@@ -1,7 +1,7 @@
 import './StakeManager.sol';
 
 /**
- * @dev Separating this off to specifically keep track of a borrower's plans/
+ * @dev Separating this off to specifically keep track of a borrower's plans.
 **/
 contract PlanManager {
     
@@ -10,21 +10,28 @@ contract PlanManager {
     
     // StakeManager calls this when a new NFT is added to update what the price for that protocol is.
     // Cover price in DAI (1e18) of price per second per DAI covered.
+    /**
+     * @notice Figure this out with new bytes32 protocol structure.
+    **/
     mapping (address => uint256) ynftCoverPrice;
     
     // Mapping to keep track of how much coverage we've sold for each protocol.
     // keccak256(protocol, coverCurrency) => total borrowed cover
-    mapping (address => uint256) totalUsedCover;
+    mapping (bytes32 => uint256) totalBorrowedAmount;
     
     // The amount of markup for Armor's service vs. the original cover cost.
     uint256 public markup;
     
     // Mapping = protocol => cover amount
+    /**
+     * @notice  Does this timestamp need to be over a certain amount of time?
+     *          this may be able to be put off for now.
+    **/
     struct Plan {
         uint128 startTime;
         uint128 endTime;
         mapping (address => uint256) coverAmounts;
-        address[] protocols;
+        bytes32[] protocols;
     }
     
     /**
@@ -33,21 +40,19 @@ contract PlanManager {
      * @param _coverAmounts The amount of coverage desired in FULL DAI (0 decimals).
      * @notice Let's simplify this somehow--even just splitting into different functions.
     **/
-    function updatePlan(address[] _protocols, uint256[] _coverAmounts)
+    function updatePlan(bytes32[] _protocols, uint256[] _coverAmounts)
       external
     {
         // Need to get price of the protocol here
         require(_protocols.length == _coverAmounts.length, "Input array lengths do not match.");
         
-        // Require that new amounts can be covered by coverage left
-        //require()
+        address user = msg.sender;
         
         // This reverts on not enough cover. Only do check in actual update to avoid multiple loops checking coverage.
         Plans memory oldPlan = plans[msg.sender][plans[msg.sender].length - 1];
         updateTotals(_protocols, _coverAmounts, oldPlan);
         
         
-        address user;
         uint256 newPricePerSec;
         uint256 _markup = markup;
 
@@ -71,6 +76,9 @@ contract PlanManager {
         uint256 balance = BalanceManager.balanceOf(user);
         uint256 endTime = balance / newPricePerSec + now;
         
+        // Set old plan to have ended now.
+        plans[user][plans[user.length - 1]].endTime = block.timestamp;
+
         newPlan = (now, endTime, protocolCovers, _protocols, _coverCurrency);
         plans[user].push(newPlan);
         
@@ -82,7 +90,7 @@ contract PlanManager {
      * @dev Update the contract-wide totals for each protocol that has changed.
      * @notice I don't like this, how can it be better?
     **/
-    function updateTotals(address[] _newProtocols, uint256[] _newCoverAmounts, bytes4[] _coverCurrency, Plan memory _oldPlan)
+    function updateTotals(address[] _newProtocols, uint256[] _newCoverAmounts, Plan memory _oldPlan)
       internal
     {
         // Loop through all last covered protocols and amounts
@@ -115,9 +123,9 @@ contract PlanManager {
      * @param _hackTime The timestamp of when a hack happened.
      * @returns The amount of coverage the user had at the time--0 if none.
     **/
-    function checkCoverage(address _user, address _protocol, uint256 _hackTime)
+    function checkCoverage(address _user, bytes32 _protocol, uint256 _hackTime)
       external
-      // Make sure we update balance if neede
+      // Make sure we update balance if needed
     returns (uint256)
     {
         // This may be more gas efficient if we don't grab this first but instead grab each plan from storage individually?
@@ -132,7 +140,9 @@ contract PlanManager {
             // Only one plan will be active at the time of a hack--return cover amount from then.
             if (_hackTime >= plan.startTime && _hackTime <= _endTime) {
                 
-                return plan.coverAmounts[_protocol];
+                uint256 coverAmount = plan.coverAmounts[_protocol];
+                plan.coverAmounts[_protocol] = 0;
+                return coverAmount;
             
             }
             
@@ -146,9 +156,9 @@ contract PlanManager {
      * @param _user The protocol whose yNFT price is being updated.
      * @param _newPrice the new price PER BLOCK that the user will be paying.
     **/
-    function changePrice(address _protocol, uint256 _newPrice)
+    function changePrice(bytes32 _protocol, uint256 _newPrice)
       external
-      onlyLendManager
+      onlyStakeManager
     {
         ynftCoverPrice[_protocol] = _newPrice;
     }
