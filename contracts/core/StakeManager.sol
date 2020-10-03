@@ -20,11 +20,8 @@ contract StakeManager is IToken {
     constant ETH_SIG = bytes4(0x45544800);
     constant DAI_SIG = bytes4(0x44414900);
     
+    // I think we 
     MakerDao public makerDao;
-    /**
-     * @notice  NFT contract actually needs to be multiple contracts I think? The yNFT tokens
-     *          do not tell you which cover currency they are so we must judge by contract.
-    **/
     IERC721 public nftContract;
     IERC20 public daiContract;
     RewardManager public rewardManager;
@@ -34,7 +31,7 @@ contract StakeManager is IToken {
     
     // The total amount of cover that is currently being staked.
     // mapping (keccak256(protocol, coverCurrencySig) => cover amount)
-    mapping (bytes32 => uint256) public totalStakedCover;
+    mapping (bytes32 => uint256) public totalStakedAmount;
     
     // Mapping to keep track of which NFT is owned by whom.
     mapping (uint256 => address) nftOwners;
@@ -51,6 +48,12 @@ contract StakeManager is IToken {
         rewardManager = RewardManager(_rewardManager);
     }
     
+    modifier updateStake(address _user)
+    {
+        rewardManager.updateStake(_user);
+        _;
+    }
+    
     /**
      * @dev stakeNft allows a user to submit their NFT to the contract and begin getting returns.
      *      This yNft cannot be withdrawn!
@@ -58,31 +61,23 @@ contract StakeManager is IToken {
     **/
     function stakeNft(uint256 _nftId, bytes4 _coverCurrency)
       public
+      updateStake(msg.sender)
     {
-        // Find user then update their stake before adding a new NFT.
-        address user = msg.sender;
-        rewardManager.updateStake(user);
-        
-        _stake(_nftId, _coverCurrency, user);
+        _stake(_nftId, user);
     }
 
     /**
      * @dev stakeNft allows a user to submit their NFT to the contract and begin getting returns.
      * @param _nftIds The ID of the NFT being staked.
     **/
-    function batchStakeNft(uint256[] calldata _nftIds, bytes4[] calldata _coverCurrencies)
+    function batchStakeNft(uint256[] calldata _nftIds)
       public
+      updateStake(msg.sender);
     {
-        require(_nftIds.length == _coverCurrencies.length);
-        
-        // Find user then update their stake before adding a new NFT.
-        address user = msg.sender;
-        rewardManager.updateStake(user);
-
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
             
-            _stake(_nftIds[i], _coverCurrencies[i]user);
+            _stake(_nftIds[i], msg.sender);
             
         }
     }
@@ -103,10 +98,7 @@ contract StakeManager is IToken {
         
         // determine cover price, convert to dai if needed
         
-        /**
-         * @notice All of these should be modifiers
-        **/
-        rewardManager.updateStake(user);
+        stakeManager.updateStake(user);
         _subtractCovers(user, yNft.coverAmount);
         
         // Returns the caller some gas as well as ensure this function cannot be called again.
@@ -115,18 +107,16 @@ contract StakeManager is IToken {
 
     /**
      * @dev Check whether a new TOTAL cover is allowed.
-     * @param _protocol Address of the protocol to be checked.
-     * @param _coverCurrency ETH or DAI sig.
+     * @param _protocol Bytes32 keccak256(address protocol, bytes4 coverCurrency).
      * @param _totalCover The new total amount that would be being borrowed.
      * @returns Whether or not this new total borrowed amount would be able to be covered.
     **/
-    function allowedCover(address _protocol, bytes4 _coverCurrency, uint256 _totalBorrowedCover)
+    function allowedCover(bytes32 _protocol, uint256 _totalBorrowedAmount)
       public
       view
     returns (bool)
     {
-        bytes32 protocol = keccak256(_protocol, _coverCurrency);
-        return _totalBorrowedCover <= totalStakedCover[protocol];
+        return _totalBorrowedAmount <= totalStakedAmount[_protocol];
     }
     
     /**
@@ -144,13 +134,19 @@ contract StakeManager is IToken {
         
         // cover price (Dai per second)
         
+        /**
+         * @notice We need to find protocol then keccak it with staking
+        **/
+        planManager.changePrice(price);
+        
         // Reverts on failure.
         _checkNftValid(yNft);
         
         require(nftContract.transferFrom(_user, claimManager, _nftId), "NFT transfer was unsuccessful.");
 
         nftOwners[_nftId] = _user;
-        _addCovers(_user, yNft.coverAmount, daiCoverPrice);
+
+        _addCovers(_user, yNft.coverAmount, daiCoverPrice, protocol);
     }
     
     /**
@@ -183,14 +179,14 @@ contract StakeManager is IToken {
      * @param _coverAmount The amount of cover being added.
      * @notice this must be changed for users to add cover price rather than amount
     **/
-    function _addCovers(address _user, uint256 _coverAmount, uint256 _coverPrice)
+    function _addCovers(address _user, uint256 _coverAmount, uint256 _coverPrice, bytes32 _protocol)
       internal
     {
         /**
          * @notice This needs to point to user cover on RewardManager.
         **/
-        userCover[_user] = userCover[_user].add(_coverPrice);
-        totalStakedCover = totalStakedCover.add(_coverAmount);
+        rewardManager.addStakes(_user, _coverPrice);
+        totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
     }
     
     /**
@@ -198,14 +194,14 @@ contract StakeManager is IToken {
      * @param _user The user who is having the token removed.
      * @param _coverAmount The amount of cover being removed.
     **/
-    function _subtractCovers(address _user, uint256 _coverAmount)
+    function _subtractCovers(address _user, uint256 _coverAmount, uint256 _coverPrice)
       internal
     {
         /**
          * @notice This needs to point to user cover on RewardManager.
         **/
-        userCover[_user] = userCover[_user].sub(_coverAmount);
-        totalStakedCover = totalStakedCover.sub(_coverAmount);
+        rewardManager.subStakes(_user, _coverPrice);
+        totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     
     /**
