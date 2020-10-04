@@ -1,15 +1,17 @@
+pragma experimental ABIEncoderV2;
 pragma solidity ^0.6.6;
 
 import '../general/SafeMath.sol';
 import '../interfaces/IToken.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
-import '../RewardManager.sol';
-
+import '../interfaces/INexusMutual.sol';
+import './RewardManager.sol';
+import './PlanManager.sol';
 /**
  * @dev Encompasses all functions taken by stakers.
 **/
-contract StakeManager is IToken {
+contract StakeManager {
     
     using SafeMath for uint;
     
@@ -17,15 +19,18 @@ contract StakeManager is IToken {
      * @notice  Don't even know if these are needed since the tokens are on separate contracts
      *          and we can just differentiate that way.
     **/
-    constant ETH_SIG = bytes4(0x45544800);
-    constant DAI_SIG = bytes4(0x44414900);
+    bytes4 public constant ETH_SIG = bytes4(0x45544800);
+    bytes4 public constant DAI_SIG = bytes4(0x44414900);
     
-    // I think we 
-    MakerDao public makerDao;
-    IERC721 public nftContract;
+    //do we have to move this to directory?
+    // external contract addresses
+    IToken public nftContract;
     IERC20 public daiContract;
+    INXMMaster public nxmMaster;
+   
+    // internal contract addresses 
     RewardManager public rewardManager;
-    
+    PlanManager public planManager;
     // All NFTs will be immediately sent to the claim manager.
     address public claimManager;
     
@@ -38,14 +43,17 @@ contract StakeManager is IToken {
     
     
     /**
-     * @dev Construct the contract with the yNFT contract.
-     * @param _nftContract Address of the yNFT contract.
+     * @dev Construct the contract with the yNft contract.
+     * @param _nftContract Address of the yNft contract.
     **/
-    constructor(address _nftContract, address _rewardManager)
+    constructor(address _nxmMaster, address _nftContract, address _rewardManager, address _planManager, address _claimManager)
       public
     {
-        nftContract = IERC721(_nftContract);
+        nxmMaster = INXMMaster(_nxmMaster);
+        nftContract = IToken(_nftContract);
         rewardManager = RewardManager(_rewardManager);
+        planManager = PlanManager(_planManager);
+        claimManager = _claimManager;
     }
     
     modifier updateStake(address _user)
@@ -59,11 +67,11 @@ contract StakeManager is IToken {
      *      This yNft cannot be withdrawn!
      * @param _nftId The ID of the NFT being staked.
     **/
-    function stakeNft(uint256 _nftId, bytes4 _coverCurrency)
+    function stakeNft(uint256 _nftId)
       public
       updateStake(msg.sender)
     {
-        _stake(_nftId, user);
+        _stake(_nftId, msg.sender);
     }
 
     /**
@@ -72,13 +80,11 @@ contract StakeManager is IToken {
     **/
     function batchStakeNft(uint256[] calldata _nftIds)
       public
-      updateStake(msg.sender);
+      updateStake(msg.sender)
     {
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
-            
             _stake(_nftIds[i], msg.sender);
-            
         }
     }
 
@@ -89,17 +95,17 @@ contract StakeManager is IToken {
     function removeExpiredNft(uint256 _nftId)
       public
     {
-        // Grab yNFT struct from the ERC21 smart contract.
+        // Grab yNft struct from the ERC21 smart contract.
         // Must make this grab based on Eth/Dai contract.
-        Token memory yNft = nftContract.getToken(_nftId);
+        Token memory yNft = nftContract.tokens(_nftId);
         
         address user = nftOwners[_nftId];
-        require(_checkNftExpired(yNft, user), "NFT is not valid.");
+        _checkNftExpired(yNft, user);
         
         // determine cover price, convert to dai if needed
         
-        stakeManager.updateStake(user);
-        _subtractCovers(user, yNft.coverAmount);
+        rewardManager.updateStake(user);
+        _subtractCovers(user, yNft.coverAmount, yNft.coverPrice, _getProtocolBytes32(yNft));
         
         // Returns the caller some gas as well as ensure this function cannot be called again.
         delete nftOwners[_nftId];
@@ -108,8 +114,8 @@ contract StakeManager is IToken {
     /**
      * @dev Check whether a new TOTAL cover is allowed.
      * @param _protocol Bytes32 keccak256(address protocol, bytes4 coverCurrency).
-     * @param _totalCover The new total amount that would be being borrowed.
-     * @returns Whether or not this new total borrowed amount would be able to be covered.
+     * @param _totalBorrowedAmount The new total amount that would be being borrowed.
+     * returns Whether or not this new total borrowed amount would be able to be covered.
     **/
     function allowedCover(bytes32 _protocol, uint256 _totalBorrowedAmount)
       public
@@ -127,34 +133,52 @@ contract StakeManager is IToken {
     function _stake(uint256 _nftId, address _user)
       internal
     {
-        Token memory yNft = nftContract.getToken(_nftId);
+        Token memory yNft = nftContract.tokens(_nftId);
+        // Reverts on failure.
+        _checkNftValid(yNft);
         
+        address protocol = _getProtocolAddress(yNft.coverId);
         // cover price must be converted from eth to dai if eth
-        uint256 daiPrice = makerDao.getDai();
-        
+        //uint256 daiPrice = makerDao.getDai();
+        uint256 daiCoverPrice = yNft.coverCurrency == DAI_SIG ? yNft.coverPrice : _convertEth(yNft.coverPrice);
         // cover price (Dai per second)
         
         /**
          * @notice We need to find protocol then keccak it with staking
         **/
-        planManager.changePrice(price);
+        bytes32 protocolWithCurrency = _getProtocolBytes32(yNft);
+        //TODO temp
+        uint256 price = 100;
+        planManager.changePrice(protocolWithCurrency, price);
         
-        // Reverts on failure.
-        _checkNftValid(yNft);
-        
-        require(nftContract.transferFrom(_user, claimManager, _nftId), "NFT transfer was unsuccessful.");
+        nftContract.transferFrom(_user, claimManager, _nftId);
 
         nftOwners[_nftId] = _user;
 
-        _addCovers(_user, yNft.coverAmount, daiCoverPrice, protocol);
+        _addCovers(_user, yNft.coverAmount, daiCoverPrice, protocolWithCurrency);
+    }
+
+    function _getProtocolBytes32(Token memory yNft) internal returns(bytes32) {
+        address protocol = _getProtocolAddress(yNft.coverId);
+        return keccak256(abi.encodePacked(protocol,yNft.coverCurrency));
+    }
+
+    function _getProtocolAddress(uint256 _coverId) internal returns(address) {
+        QuotationData quotationData = QuotationData(nxmMaster.getLatestAddress("QD"));
+        address scAddress;
+        ( , , scAddress, , , ) = quotationData.getCoverDetailsByCoverID1(_coverId);
+        return scAddress;
     }
     
     /**
      * @dev Converts Ether price and 
+     */
     function _convertEth(uint256 _ethAmount)
       internal
-    return (uint256)
-    **/
+    returns (uint256) {
+      ///TODO just return for now
+      return _ethAmount;
+    }
     
     /**
      * @dev Find price per DAI per second of latest NFT submitted.
@@ -166,11 +190,11 @@ contract StakeManager is IToken {
     {
         // Let's switch this out for SafeMath. (lol at below var)
         uint256 noWeiDai = _coverAmount.div(1e18);
-        uint256 secsLength = _expireTime - _genTime;
+        uint256 secsLength = _expireTime.sub(_genTime);
         
         // 1,000 dai price to cover 10,000 dai for 1 month:
         // 1000 * 1e18 / 10000 / 2592000 = 3.8580247e+15 DAI/second == $33.33... per day
-        price = _coverPrice / noWeiDai / secsLength;
+        price = _coverPrice.div(noWeiDai).div(secsLength);
     }
     
     /**
@@ -194,7 +218,7 @@ contract StakeManager is IToken {
      * @param _user The user who is having the token removed.
      * @param _coverAmount The amount of cover being removed.
     **/
-    function _subtractCovers(address _user, uint256 _coverAmount, uint256 _coverPrice)
+    function _subtractCovers(address _user, uint256 _coverAmount, uint256 _coverPrice, bytes32 _protocol)
       internal
     {
         /**
@@ -223,7 +247,7 @@ contract StakeManager is IToken {
       internal
     {
         require(_yNft.expirationTimestamp <= now, "NFT is not expired.");
-        require(_user != address(0), "NFT does not exist on this contract.")
+        require(_user != address(0), "NFT does not exist on this contract.");
     }
     
 }

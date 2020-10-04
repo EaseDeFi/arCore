@@ -82,7 +82,7 @@ contract NFTInfo {
         }
           
         // then check if depositing nft will last more than latest
-        if (info[tail].expiresAt <= expiresAt) {
+        if (infos[tail].expiresAt <= expiresAt) {
             
             // push nft at tail
             infos[nftId] = DepositInfo(tail,0,user,expiresAt);
@@ -118,8 +118,8 @@ contract NFTInfo {
             
             }
         
-            infos[nftId] = DepositInfo(cursor, infos[cursor].before, user, expiresAt);
-            infos[infos[cursor].before].next = nftId;
+            infos[nftId] = DepositInfo(cursor, infos[cursor].prev, user, expiresAt);
+            infos[infos[cursor].prev].next = nftId;
             infos[cursor].prev = nftId;
         
             //now update bucket's head/tail data
@@ -171,7 +171,7 @@ contract NFTInfo {
         uint256 popped = head;
         head = infos[head].next;
     
-        head.prev = 0;
+        infos[head].prev = 0;
         if(head == 0){
             // no more nft left... good bye
             tail = 0;
