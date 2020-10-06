@@ -3,11 +3,12 @@ pragma solidity ^0.6.6;
 import '../general/SafeMath.sol';
 import '../general/Ownable.sol';
 import '../interfaces/IERC20.sol';
+import './StakeManager.sol';
 
 /**
  * @dev RewardManager keeps track of reward balances that yNFT stakers receive. They will be deposited as ARMOR.
 **/
-contract RewardManager is Ownable, SafeMath {
+contract RewardManager is Ownable {
     
     using SafeMath for uint;
     
@@ -19,7 +20,7 @@ contract RewardManager is Ownable, SafeMath {
     Deposit[] public deposits;
     
     // The cost of all currently active NFTs.
-    uint256 totalStakedPrice;
+    uint256 public totalStakedPrice;
     
     // Full cover cost provided by this user.
     mapping (address => uint256) public userStakedPrice;
@@ -28,7 +29,7 @@ contract RewardManager is Ownable, SafeMath {
     mapping (address => uint256) public balances;
     
     // The last `deposits` index that the user updated on.
-    mapping (address => uint256) lastIndex;
+    mapping (address => uint256) public lastIndex;
     
     // Deposit struct for every time a deposit of ARMOR tokens is made.
     // This will stream into an account over 24 hours.
@@ -41,13 +42,17 @@ contract RewardManager is Ownable, SafeMath {
     
     /**
      * @dev Must have LendManager contract to get user balances.
-     * @param _lendManager Address of the LendManager contract.
     **/
     constructor(address _stakeManager, address _armorToken)
       public
     {
         stakeManager = StakeManager(_stakeManager);
         armorToken = IERC20(_armorToken);
+    }
+
+    modifier onlyStakeManager() {
+      require(msg.sender == address(stakeManager), "Only StakeManager can call this function");
+      _;
     }
     
     /**
@@ -99,7 +104,7 @@ contract RewardManager is Ownable, SafeMath {
     {
         require(armorToken.transferFrom(msg.sender, address(this), _amount), "ARMOR deposit was unsuccessful.");
         
-        Deposit memory newDeposit = Deposit(totalStakedPrice, _amount);
+        Deposit memory newDeposit = Deposit(totalStakedPrice, _amount, now);
         deposits.push(newDeposit);
     }
     
@@ -112,7 +117,7 @@ contract RewardManager is Ownable, SafeMath {
       view
     returns (uint256)
     {
-        updateStake(_user);
+        //updateStake()
         return balances[_user];
     }
     
@@ -133,12 +138,12 @@ contract RewardManager is Ownable, SafeMath {
      * @param _user The user to add stake to.
      * @param _coverPrice The price of the cover.
     **/
-    function addStakes(_user, _coverPrice)
+    function addStakes(address _user, uint256 _coverPrice)
       external
       onlyStakeManager
     {
-        userStakedPrice = userStakedPrice.add(_coverPrice);
-        totalStakePrice = totalStakedPrice.add(_coverPrice);
+        userStakedPrice[_user] = userStakedPrice[_user].add(_coverPrice);
+        totalStakedPrice = totalStakedPrice.add(_coverPrice);
     }
     
     /**
@@ -146,12 +151,13 @@ contract RewardManager is Ownable, SafeMath {
      * @param _user The user to subtract stake from.
      * @param _coverPrice The price of the cover.
     **/
-    function addStakes(_user, _coverPrice)
+    //CHECK: changed name addStakes -> subStakes(temporary)
+    function subStakes(address _user, uint256 _coverPrice)
       external
       onlyStakeManager
     {
-        userStakedPrice = userStakedPrice.sub(_coverPrice);
-        totalStakePrice = totalStakedPrice.sub(_coverPrice);
+        userStakedPrice[_user] = userStakedPrice[_user].sub(_coverPrice);
+        totalStakedPrice = totalStakedPrice.sub(_coverPrice);
     }
     
     /**
@@ -168,7 +174,8 @@ contract RewardManager is Ownable, SafeMath {
         for (uint256 i = _lastIndex + 1; i < deposits.length; i++) {
             
             Deposit memory curDeposit = deposits[i];
-            
+            //CHECK: how to get _coverAmount?
+            uint256 _coverAmount = 10; 
             // Example with simple numbers, 10 is a buffer to ensure we don't divide by too big of a number.
             // reward = ( ( 1 * 10 ) / 2 ) * 2 ) / 10
             uint256 buffer = 1e18;

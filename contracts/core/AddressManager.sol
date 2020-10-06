@@ -1,11 +1,11 @@
 pragma solidity ^0.6.6;
 
-import './Ownable.sol';
+import '../general/Ownable.sol';
 
 /**
  * @dev Directory is used to keep track of the different contract proxies in our system.
 **/
-contract Directory {
+contract Directory is Ownable {
     
     // Address of the proxies for each contract, identified by keccak256("ContractName").
     mapping (bytes32 => address) proxyAddresses;
@@ -13,12 +13,11 @@ contract Directory {
     /**
      * @dev Used by contracts to get the address of a contract in the system.
      * @param _contractName the keccak256'ed name of the contract.
-     * @returns Address of the desired contract.
     **/
     function getAddress(bytes32 _contractName)
       external
       view
-    return (address)
+    returns (address scAddress)
     {
         return proxyAddresses[_contractName];
     }
