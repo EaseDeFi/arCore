@@ -926,7 +926,7 @@ contract yInsure is
     **/
     function redeemClaim(uint256 tokenId) public onlyTokenApprovedOrOwner(tokenId)  nonReentrant {
         //require(tokens[tokenId].claimInProgress, "No claim is in progress");
-        require(claimIds[tokenId] == 0, "No claim is in progress.");
+        require(claimIds[tokenId] != 0, "No claim is in progress.");
         
         //uint8 coverStatus;
         //uint sumAssured;
@@ -1085,11 +1085,15 @@ contract yInsure is
     function _sendAssuredSum(bytes4 coverCurrency, uint sumAssured) internal {
         uint256 claimReward = sumAssured * 1e18;
         if (coverCurrency == ethCurrency) {
+            
             //msg.sender.transfer(sumAssured);
             msg.sender.transfer(claimReward);
+            
         } else {
             IERC20 erc20 = IERC20(_getCurrencyAssetAddress(coverCurrency));
+            
             //require(erc20.transfer(msg.sender, sumAssured), "Transfer failed");
+            
             require(erc20.transfer(msg.sender, claimReward), "Transfer failed");
         }
     }
