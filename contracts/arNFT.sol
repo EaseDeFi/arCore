@@ -736,7 +736,7 @@ interface MemberRoles {
 /**
  * @dev All commented out lines in yInsure were changed for the arNFT implementation.
 **/
-contract yInsure is
+contract arInsure is
     ERC721Full("ArmorNFT", "arNFT"),
     Ownable,
     ReentrancyGuard {
@@ -1050,7 +1050,6 @@ contract yInsure is
             //IERC20 erc20 = IERC20(poolData.getCurrencyAssetAddress(coverCurrency));
             /**
              * @notice This should be able to be removed if we approve ERC20 for -1
-             *          Not super sure exactly what ERC20s are being used though...
             **/
             //erc20.approve(pool1Address, coverPrice);
             
@@ -1083,6 +1082,9 @@ contract yInsure is
      * @notice I think this has no decimals?
     **/
     function _sendAssuredSum(bytes4 coverCurrency, uint sumAssured) internal {
+        /**
+         * @notice Change 1e18 to token decimals.
+        **/
         uint256 claimReward = sumAssured * 1e18;
         if (coverCurrency == ethCurrency) {
             
