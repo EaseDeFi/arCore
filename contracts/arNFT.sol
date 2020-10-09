@@ -733,16 +733,7 @@ interface MemberRoles {
     function switchMembership(address) external;
 }
 
-/**
- * @dev All commented out lines in yInsure were changed for the arNFT implementation.
-**/
-contract arInsure is
-    ERC721Full("ArmorNFT", "arNFT"),
-    Ownable,
-    ReentrancyGuard {
-    
-    /**
-     * @dev arNFT does not use token struct.
+interface IyInsure {
     struct Token {
         uint expirationTimestamp;
         bytes4 coverCurrency;
@@ -755,6 +746,23 @@ contract arInsure is
         bool claimInProgress;
         uint claimId;
     }
+    
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function submitClaim(uint256 tokenId) external;
+    function tokens(uint256 tokenId) external returns (uint, bytes4, uint, uint, uint, uint, uint, uint, bool, uint);
+}
+
+/**
+ * @dev All commented out lines in yInsure were changed for the arNFT implementation.
+**/
+contract arInsure is
+    ERC721Full("ArmorNFT", "arNFT"),
+    Ownable,
+    ReentrancyGuard {
+    
+    /**
+     * @dev arNFT does not use token struct.
+
     **/
     
     using SafeMath for uint;
@@ -772,7 +780,14 @@ contract arInsure is
     // cover Id => claim Id
     mapping (uint256 => uint256) public claimIds;
     
+    // cover ID => yNFT token id. Will be 0 if it was not a swap.
+    // Used to route yNFT submits through their contract.
+    mapping(uint256 => uint256) public swapIds;
+    
     INXMMaster constant public nxMaster = INXMMaster(0x01BFd82675DBCc7762C84019cA518e701C0cD07e);
+
+    // yNFT contract that we're swapping tokens from.
+    IyInsure constant public ynft = IyInsure(0x181Aea6936B407514ebFC0754A37704eB8d98F91);
     
     enum CoverStatus {
         Active,
@@ -890,12 +905,84 @@ contract arInsure is
     }
     
     /**
+     * @dev Buy function but to be done in batches.
+    **/
+    function batchBuyCover(
+        address[] calldata coveredContractAddresses,
+        bytes4 coverCurrency,
+        uint[] calldata coverDetails1,
+        uint[] calldata coverDetails2,
+        uint[] calldata coverDetails3,
+        uint[] calldata coverDetails4,
+        uint16[] calldata coverPeriods,
+        uint8[] calldata _v,
+        bytes32[] calldata _r,
+        bytes32[] calldata _s
+    ) external payable {
+        
+        // Is there a better way to do this?
+        uint256 lengths = coveredContractAddresses.length;
+        require(coverDetails1.length == lengths &&
+                coverDetails2.length == lengths &&
+                coverDetails3.length == lengths &&
+                coverDetails4.length == lengths &&
+                coverPeriods.length == lengths &&
+                _v.length == lengths &&
+                _r.length == lengths &&
+                _s.length == lengths);
+    
+        // Get full cover price of all NFTs being bought.
+        uint256 coverPrice = _getCoverPrice(coverDetails1);
+        
+        // Transfer full price for all at once.
+        if (coverCurrency == "ETH") {
+            require(msg.value == coverPrice, "Incorrect value sent");
+        } else {
+            IERC20 erc20 = IERC20(_getCurrencyAssetAddress(coverCurrency));
+            require(erc20.transferFrom(msg.sender, address(this), coverPrice), "Transfer failed");
+        }
+    
+        // All lengths are the same, _s is just a short parameter name...
+        for (uint256 i = 0; i < _s.length; i++) {
+            
+            uint256[] storage details =;
+            details.push(coverDetails1[i]);
+            //details.push(coverDetails2[i]);
+            //details.push(coverDetails3[i]);
+            //details.push(coverDetails4[i]);
+            
+            uint256 coverId = _buyCover(
+                coveredContractAddresses[i],
+                coverCurrency,
+                details,
+                coverPeriods[i],
+                _v[i],
+                _r[i],
+                _s[i]
+            );
+            
+        }
+    }
+    
+    /**
      * @dev Submit a claim for the NFT after a hack has happened on its protocol.
      * @param tokenId ID of the token a claim is being submitted for.
     **/
     function submitClaim(uint256 tokenId) external onlyTokenApprovedOrOwner(tokenId) {
         //if (tokens[tokenId].claimInProgress) {
         // Cover ID and token ID are identical--use of both for clarity.
+        
+        // If this was a yNFT swap, we must route the submit through them.
+        if (swapIds[tokenId] != 0) {
+            
+            uint256 ynftTokenId = swapIds[tokenId];
+            ynft.submitClaim(ynftTokenId);
+            
+            (/*coverId*/, uint256 claimId) = _getCoverAndClaim(ynftTokenId);
+            claimIds[tokenId] = claimId;
+            
+            return;
+        }
         
         (uint256 coverId, uint8 coverStatus, /*sumAssured*/, /*coverPeriod*/, uint256 validUntil) = _getCover2(tokenId);
             
@@ -952,6 +1039,30 @@ contract arInsure is
         
         //emit ClaimRedeemed(msg.sender, sumAssured, tokens[tokenId].coverCurrency);
         emit ClaimRedeemed(msg.sender, sumAssured, currencyCode);
+    }
+    
+    /**
+     * @dev External swap yNFT token for our own. Simple process because we do not need to create cover.
+     * @param _tokenId The ID of the token on yNFT's contract.
+    **/
+    function swapYnft(uint256 _tokenId)
+      public
+    {
+        require(ynft.transferFrom(msg.sender, address(this), _tokenId), "yNFT was not successfully transferred.");
+        (uint256 coverId,/*claimId*/) = _getCoverAndClaim(_tokenId);
+        _mint(msg.sender, coverId);
+    }
+    
+    /**
+     * @dev Swaps a batch of yNFT tokens for our own.
+     * @param _tokenIds An array of the IDs of the tokens on yNFT's contract.
+    **/
+    function batchSwapYnft(uint256[] calldata _tokenIds)
+      external
+    {
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            swapYnft(_tokenIds[i]);
+        }
     }
     
    /**
@@ -1101,6 +1212,32 @@ contract arInsure is
     }
     
     /**
+     * @dev Get the full cover price required when buying batch NFTs.
+     * @param _coverPrices Prices for each separate cover being bought.
+    **/
+    function _getCoverPrice(uint256[] memory _coverPrices)
+      internal
+      view
+    returns (uint256 coverPrice)
+    {
+        for (uint256 i = 0; i < _coverPrices.length; i++) {
+            coverPrice += _coverPrices[i];
+        }
+    }
+    
+    /**
+     * @dev Get the cover Id and claim Id of the token from the ynft contract.
+     * @param _ynftTokenId The Id of the token on the ynft contract.
+    **/
+    function _getCoverAndClaim(uint256 _ynftTokenId)
+      internal
+      view
+    returns (uint256 coverId, uint256 claimId)
+    {
+       ( , , , , , , , coverId, , claimId) = ynft.tokens(_ynftTokenId);
+    }
+    
+    /**
      * @dev Get (some) cover details from the NXM contracts.
      * @param coverId ID of the cover to get--same as our token ID.
      * @return Details about the token.
@@ -1216,6 +1353,6 @@ contract arInsure is
         withdrawableTokens[ethCurrency] = withdrawableTokens[ethCurrency].add(ethValue);
     }**/
     
-    /**function () payable external {
-    }**/
+    function () payable external {
+    }
 }
