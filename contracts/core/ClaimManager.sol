@@ -1,11 +1,9 @@
-pragma experimental ABIEncoderV2;
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/INexusMutual.sol';
-import '../interfaces/IToken.sol';
 import './PlanManager.sol';
 
 /**
@@ -94,7 +92,7 @@ contract ClaimManager is Ownable {
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
 
         // require ynft has not been claimed
-        Token memory token = IToken(address(nexusMutual)).tokens(_nftId);
+        //Token memory token = IToken(address(nexusMutual)).tokens(_nftId);
         
         // Make sure yNFT was not expired.
         

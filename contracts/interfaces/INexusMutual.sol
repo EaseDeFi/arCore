@@ -19,7 +19,7 @@ interface INXMMaster {
     function getLatestAddress(bytes2 _contractName) external view returns(address payable contractAddress);
 }
 
-interface QuotationData {
+interface IQuotationData {
 
     enum HCIDStatus { NA, kycPending, kycPass, kycFailedOrRefunded, kycPassNoCover }
     enum CoverStatus { Active, ClaimAccepted, ClaimDenied, CoverExpired, ClaimSubmitted, Requested }
@@ -59,6 +59,7 @@ interface QuotationData {
         uint _cid
     )
     external
+    view
     returns (
         uint cid,
         address _memberAddress,
