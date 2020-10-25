@@ -3,7 +3,7 @@ pragma solidity ^0.6.6;
 import '../general/Ownable.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
-import '../interfaces/INexusMutual.sol';
+import '../interfaces/IarNFT.sol';
 import './PlanManager.sol';
 
 /**
@@ -14,12 +14,11 @@ contract ClaimManager is Ownable {
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
     bytes4 public constant DAI_SIG = bytes4(0x44414900);
     
-    // this is actually going to be the yinsure contract.
-    INexusMutual public nexusMutual;
-    
     IERC20 public daiContract;
 
     PlanManager public planManager;
+
+    IarNFT public arNFT;
 
     // Mapping of hacks that we have confirmed to have happened. (keccak256(protocol ID, timestamp) => didithappen).
     mapping (bytes32 => bool) confirmedHacks;
@@ -32,20 +31,22 @@ contract ClaimManager is Ownable {
     
     /**
      * @dev Start the contract off by giving it the address of Nexus Mutual to submit a claim.
-     * @dev _nexusMutual Address of the Nexus Mutual contract.
      * @dev _daiContract Address of the Dai contract.
+     * @dev _planManager Address of the PlanManager Armor contract.
+     * @dev __arNFT Address of the arNFT contract.
     **/
-    constructor(address _nexusMutual, address _daiContract, address _planManager)
+    constructor(address _daiContract, address _planManager, address _arNFT)
       public
     {
-        nexusMutual = INexusMutual(_nexusMutual);
         daiContract = IERC20(_daiContract);
         planManager = PlanManager(_planManager);
+        arNFT = IarNFT(_arNFT);
     }
     
     /**
      * @dev User requests claim based on a loss.
      *      Do we want this to be callable by anyone or only the person requesting?
+     *      Proof-of-Loss must be implemented here.
      * @param _hackTime The given timestamp for when the hack occurred.
      * @notice Make sure this cannot be done twice. I also think this protocol interaction can be simplified.
     **/
@@ -91,32 +92,31 @@ contract ClaimManager is Ownable {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
 
-        // require ynft has not been claimed
-        //Token memory token = IToken(address(nexusMutual)).tokens(_nftId);
-        
-        // Make sure yNFT was not expired.
-        
-        // require ynft matches the protocol
-        
-        /**
-         * @notice I don't think you can get protocol from the yNFT contracts, only NXM.
-        **/
-        
-        // require ynft was active at the time of the hack
-        // PlanManager
+        (/*cid*/, uint8 status, /*sumAssured*/, /*coverPeriod*/, uint256 validUntil, address scAddress,
+         /*currencyCode*/, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
 
-        nexusMutual.submitClaim(_nftId);
+        // Call arNFT to ensure token had not been claimed
+        // Status must be Active, ClaimDenied, or CoverExpired.
+        require(status == 0 || status == 2 || status == 3);
+        
+        // Make sure arNFT was active at the time
+        require(validUntil >= _hackTime, "arNFT was not valid at time of hack.");
+
+        // Make sure arNFT protocol matches
+        require(scAddress == _protocolAddress, "arNFT does not cover correct protocol.");
+
+        arNFT.submitClaim(_nftId);
     }
     
     /**
-     * @dev Calls the yInsure contract to redeem a claim (receive funds) if it has been accepted.
+     * @dev Calls the arNFT contract to redeem a claim (receive funds) if it has been accepted.
      *      This is callable by anyone without any checks--either we receive money or it reverts.
      * @param _nftId The ID of the yNft token.
     **/
     function redeemNft(uint256 _nftId)
       external
     {
-        nexusMutual.redeemClaim(_nftId);
+        arNFT.redeemClaim(_nftId);
     }
     
     /**

@@ -20,7 +20,6 @@ contract StakeManager {
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
     bytes4 public constant DAI_SIG = bytes4(0x44414900);
     
-    //do we have to move this to directory?
     // external contract addresses
     address public nftContract;
     IERC20 public daiContract;
@@ -76,7 +75,7 @@ contract StakeManager {
      * @dev stakeNft allows a user to submit their NFT to the contract and begin getting returns.
      * @param _nftIds The ID of the NFT being staked.
     **/
-    function batchStakeNft(uint256[] calldata _nftIds)
+    function batchStakeNft(uint256[] memory _nftIds)
       public
       updateStake(msg.sender)
     {

@@ -78,9 +78,9 @@ contract BalanceManager is Ownable {
     }
 
     /**
-    * @dev Find the current balance of a user to the second.
-    * @param _user The user whose balance to find.
-        **/
+     * @dev Find the current balance of a user to the second.
+     * @param _user The user whose balance to find.
+    **/
     function balanceOf(address _user)
     public
     view

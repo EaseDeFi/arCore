@@ -2,6 +2,7 @@ pragma solidity ^0.6.6;
 import './StakeManager.sol';
 import './BalanceManager.sol';
 import '../general/MerkleProof.sol';
+
 /**
  * @dev Separating this off to specifically keep track of a borrower's plans.
 **/
