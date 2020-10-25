@@ -11,6 +11,7 @@ contract ARMOR is ERC20 {
   /// @dev only minter can call this function
   /// @param account address to receive minted token
   /// @param amount amount of tokens to be minted
+  // TODO: add onlyMinteer
   function mint(address account, uint256 amount) external {
     _mint(account, amount);
   }
