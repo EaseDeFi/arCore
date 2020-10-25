@@ -18,6 +18,7 @@ contract BalanceManager is Ownable {
     mapping (address => Balance) balances;
 
     // With lastTime and secondPrice we can determine balance by second.
+    // Second price is in DAI so we must convert.
     struct Balance {
         uint256 lastTime;
         uint256 secondPrice;
@@ -46,16 +47,15 @@ contract BalanceManager is Ownable {
 
     /**
      * @dev Borrower deposits an amount of Dai to pay for coverage.
-     * @param _amount The amount of Dai to deposit.
-     * @notice Borrower must first approve this contract to withdraw Dai.
      **/
-    function deposit(uint56 _amount) 
+    function deposit() 
     external
+    payable
     update(msg.sender)
     {
-        require(dai.transferFrom(msg.sender, address(this), _amount), "Dai deposit transfer unsuccessful.");
+        require(msg.value > 0, "No Ether was deposited.");
 
-        balances[msg.sender].lastBalance = balances[msg.sender].lastBalance.add(_amount);
+        balances[msg.sender].lastBalance = balances[msg.sender].lastBalance.add(msg.value);
         balances[msg.sender].lastTime = block.timestamp;
     }
 
@@ -74,7 +74,7 @@ contract BalanceManager is Ownable {
         balance.lastBalance = balance.lastBalance.sub(_amount);
         balances[msg.sender] = balance;
 
-        require(dai.transfer(msg.sender, _amount), "Dai withdrawal transfer unsuccessful.");
+        msg.sender.transfer(_amount);
     }
 
     /**
