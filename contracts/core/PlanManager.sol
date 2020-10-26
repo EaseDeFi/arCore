@@ -12,10 +12,7 @@ contract PlanManager {
     mapping (address => Plan[]) public plans;
     
     // StakeManager calls this when a new NFT is added to update what the price for that protocol is.
-    // Cover price in DAI (1e18) of price per second per DAI covered.
-    /**
-     * @notice Figure this out with new bytes32 protocol structure.
-    **/
+    // Cover price in ETH (1e18) of price per second per DAI covered.
     // CHECK: is it ok to keccak(protocol, coverCurrency)?
     mapping (bytes32 => uint256) public ynftCoverPrice;
     
@@ -27,6 +24,9 @@ contract PlanManager {
     
     // The amount of markup for Armor's service vs. the original cover cost.
     uint256 public markup;
+    
+    // Event to notify frontend of plan update.
+    event PlanUpdate(address indexed user, bytes32[] protocols, uint256[] amounts);
 
     StakeManager public stakeManager;
     BalanceManager public balanceManager;
@@ -98,7 +98,10 @@ contract PlanManager {
         plans[user].push(newPlan);
         
         // update balance price per second here
+        balanceManager.changePrice(user, newPricePerSec);
         // They get the same price per second as long as they ke
+        
+        emit PlanUpdate(msg.sender, _protocols, _coverAmounts);
     }
 
     // should be sorted merkletree. should be calculated off chain
@@ -149,26 +152,26 @@ contract PlanManager {
       // Make sure we update balance if needed
     returns (uint256)
     {
-        // TODO change this to verifying merkle proof
-//        // This may be more gas efficient if we don't grab this first but instead grab each plan from storage individually?
-//        Plan[] memory planArray = plans[_user];
-//        
-//        // In normal operation, this for loop should never get too big.
-//        // If it does (from malicious action), the user will be the only one to suffer.
-//        for (uint256 i = planArray.length - 1; i >= 0; i--) {
-//            
-//            Plan memory plan = planArray[i];
-//            
-//            // Only one plan will be active at the time of a hack--return cover amount from then.
-//            if (_hackTime >= plan.startTime && _hackTime <= plan.endTime) {
-//                
-//                uint256 coverAmount = plan.coverAmounts[_protocol];
-//                plan.coverAmounts[_protocol] = 0;
-//                return coverAmount;
-//            
-//            }
-//            
-//        }
+        // This may be more gas efficient if we don't grab this first but instead grab each plan from storage individually?
+        Plan[] memory planArray = plans[_user];
+        
+        // In normal operation, this for loop should never get too big.
+        // If it does (from malicious action), the user will be the only one to suffer.
+        for (uint256 i = planArray.length - 1; i >= 0; i--) {
+            
+            Plan memory plan = planArray[i];
+            
+            // Only one plan will be active at the time of a hack--return cover amount from then.
+            if (_hackTime >= plan.startTime && _hackTime <= plan.endTime) {
+                
+                // TODO: Needs to be replaced with Merkle
+                /*uint256 coverAmount = plan.coverAmounts[_protocol];
+                plan.coverAmounts[_protocol] = 0;
+                return coverAmount;*/
+            
+            }
+            
+        }
         
         return 0;
     }

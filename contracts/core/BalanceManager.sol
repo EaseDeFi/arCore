@@ -12,16 +12,16 @@ contract BalanceManager is Ownable {
 
     using SafeMath for uint;
 
-    IERC20 public dai;
+    address public planManager;
 
     // keep track of monthly payments and start/end of those
     mapping (address => Balance) balances;
 
     // With lastTime and secondPrice we can determine balance by second.
-    // Second price is in DAI so we must convert.
+    // Second price is in ETH so we must convert.
     struct Balance {
         uint256 lastTime;
-        uint256 secondPrice;
+        uint256 perSecondPrice;
         uint256 lastBalance;
     }
 
@@ -37,12 +37,12 @@ contract BalanceManager is Ownable {
 
 
     /**
-     * @param _dai The address of the Dai contract.
+     * @param _planManager Address of the PlanManager contract.
      **/
-    constructor(address _dai)
+    constructor(address _planManager)
     public
     {
-        dai = IERC20(_dai);
+        planManager = _planManager;
     }
 
     /**
@@ -92,7 +92,7 @@ contract BalanceManager is Ownable {
         uint256 lastBalance = balance.lastBalance;
 
         uint256 timeElapsed = block.timestamp.sub(balance.lastTime);
-        uint256 cost = timeElapsed * balance.secondPrice;
+        uint256 cost = timeElapsed * balance.perSecondPrice;
 
         // If the elapsed time has brought balance to 0, make it 0.
         uint256 newBalance;
@@ -133,9 +133,9 @@ contract BalanceManager is Ownable {
      **/
     function changePrice(address _user, uint256 _newPrice)
     external
-    onlyOwner
     {
-        balances[_user].secondPrice = _newPrice;
+        require(msg.sender == address(planManager), "Caller is not PlanManager.");
+        balances[_user].perSecondPrice = _newPrice;
     }
 
 }

@@ -95,6 +95,18 @@ contract RewardManager is Ownable {
     }
     
     /**
+     * @dev Updates many users at once. Used in a case such as needing to update all users before a change to the staking method.
+     * @param _users A list of all users to update.
+    **/
+    function bulkUpdate(address[] calldata _users)
+      external
+    {
+       for (uint256 i = 0; i < _users.length; i++) {
+           updateStake(_users[i]);
+       } 
+    }
+    
+    /**
      * @dev Deposit tokens to be staked. This is onlyOwner so malicious actors cannot spam the list.
      * @param _amount The amount of ARMOR to be deposited.
     **/
@@ -136,28 +148,28 @@ contract RewardManager is Ownable {
     /**
      * @dev Add stake cost to the individual user and to the total.
      * @param _user The user to add stake to.
-     * @param _coverPrice The price of the cover.
+     * @param _secondPrice The price of the cover per second.
     **/
-    function addStakes(address _user, uint256 _coverPrice)
+    function addStakes(address _user, uint256 _secondPrice)
       external
       onlyStakeManager
     {
-        userStakedPrice[_user] = userStakedPrice[_user].add(_coverPrice);
-        totalStakedPrice = totalStakedPrice.add(_coverPrice);
+        userStakedPrice[_user] = userStakedPrice[_user].add(_secondPrice);
+        totalStakedPrice = totalStakedPrice.add(_secondPrice);
     }
     
     /**
      * @dev Subtract stake cost to the individual user and to the total.
      * @param _user The user to subtract stake from.
-     * @param _coverPrice The price of the cover.
+     * @param _secondPrice The price of the cover per second.
     **/
     //CHECK: changed name addStakes -> subStakes(temporary)
-    function subStakes(address _user, uint256 _coverPrice)
+    function subStakes(address _user, uint256 _secondPrice)
       external
       onlyStakeManager
     {
-        userStakedPrice[_user] = userStakedPrice[_user].sub(_coverPrice);
-        totalStakedPrice = totalStakedPrice.sub(_coverPrice);
+        userStakedPrice[_user] = userStakedPrice[_user].sub(_secondPrice);
+        totalStakedPrice = totalStakedPrice.sub(_secondPrice);
     }
     
     /**

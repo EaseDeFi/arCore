@@ -63,17 +63,18 @@ contract ClaimManager is Ownable {
         
         require(coverage > 0, "User had no coverage at the time of this hack.");
     
-        /**
-         * @notice Coverage amount is weird. On yNFT it's 0 decimals so we must make sure we account for that.
-        **/
+        // Ether and DAI both have the same decimals (18).
+        uint256 payment = coverage * 10 ** 18;
     
         // Add Wei to these amounts.
         if (_coverCurrency == DAI_SIG) {
+            
             //TODO change to safeTransfer
-            require(daiContract.transfer(msg.sender, coverage), "DAI transfer was unsuccessful");
-        }
-        else {
-            msg.sender.transfer(coverage);
+            require(daiContract.transfer(msg.sender, payment), "DAI transfer was unsuccessful");
+        
+        } else {
+            
+            msg.sender.transfer(payment);
         }
 
         emit ClaimPayout(hackId, msg.sender, coverage);

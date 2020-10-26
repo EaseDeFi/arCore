@@ -4,6 +4,8 @@ import '../general/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/INexusMutual.sol';
+import '../interfaces/IarNFT.sol';
+import '../interfaces/IMedianizer.sol';
 import './RewardManager.sol';
 import './PlanManager.sol';
 /**
@@ -21,9 +23,10 @@ contract StakeManager {
     bytes4 public constant DAI_SIG = bytes4(0x44414900);
     
     // external contract addresses
-    address public nftContract;
+    IarNFT public arNFT;
     IERC20 public daiContract;
     INXMMaster public nxmMaster;
+    IMedianizer public medianizer;
    
     // internal contract addresses 
     RewardManager public rewardManager;
@@ -38,19 +41,28 @@ contract StakeManager {
     // Mapping to keep track of which NFT is owned by whom.
     mapping (uint256 => address) nftOwners;
     
+    // Price (in Ether per second) of an NFT. We must save this to retain eth => dai conversion from the staking.
+    mapping (uint256 => uint256) nftPrices;
+    
+    // Event launched when an NFT is staked.
+    event StakedNFT(address indexed user, bytes32 indexed protocol, uint256 nftId, uint256 sumAssured, uint16 coverPeriod, uint256 timestamp);
+    
+    // Event launched when an NFT expires.
+    event ExpiredNFT(address indexed user, bytes32 indexed protocol, uint256 nftId, uint256 sumAssured, uint16 coverPeriod, uint256 timestamp);
     
     /**
      * @dev Construct the contract with the yNft contract.
      * @param _nftContract Address of the yNft contract.
     **/
-    constructor(address _nxmMaster, address _nftContract, address _rewardManager, address _planManager, address _claimManager)
+    constructor(address _nxmMaster, address _nftContract, address _rewardManager, address _planManager, address _claimManager, address _medianizer)
       public
     {
         nxmMaster = INXMMaster(_nxmMaster);
-        nftContract = _nftContract;
+        arNFT = IarNFT(_nftContract);
         rewardManager = RewardManager(_rewardManager);
         planManager = PlanManager(_planManager);
         claimManager = _claimManager;
+        medianizer = IMedianizer(_medianizer);
     }
     
     modifier updateStake(address _user)
@@ -97,18 +109,24 @@ contract StakeManager {
         _checkNftExpired(_nftId);
         
         address user = nftOwners[_nftId];
-        require(user != address(0), "Nft does not belong here");
+        uint256 price = nftPrices[_nftId];
+        require(user != address(0) && price > 0, "NFT does not belong here.");
+        
         // determine cover price, convert to dai if needed
         rewardManager.updateStake(user);
-        uint256 sumAssured;
-        uint256 coverPrice;
-        address scAddress;
-        bytes4 coverCurrency;
-        (, scAddress, coverCurrency, sumAssured, ) = _getCoverDetails1(_nftId);
-        _subtractCovers(user, sumAssured, coverPrice, _getProtocolBytes32(scAddress, coverCurrency));
+        
+        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, /*validUntil*/, address scAddress, 
+         bytes4 coverCurrency, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
+        
+        bytes32 protocol = _getProtocolBytes32(scAddress, coverCurrency);
+        
+        _subtractCovers(user, sumAssured, price, protocol);
         
         // Returns the caller some gas as well as ensure this function cannot be called again.
         delete nftOwners[_nftId];
+        delete nftPrices[_nftId];
+        
+        emit ExpiredNFT(user, protocol, _nftId, sumAssured, coverPeriod, block.timestamp);
     }
 
     /**
@@ -130,43 +148,44 @@ contract StakeManager {
      * @param _nftId The ID of the NFT being staked. == coverId
      * @param _user The user who is staking the NFT.
     **/
-    function _stake(uint256 _nftId, address _user)
+    function _stake(uint256 _nftId, address _user) //jkhkjh
       internal
     {
         // Reverts on failure.
         _checkNftValid(_nftId);
         
-        // nftId == coverId on arNFT 
-        address protocol = _getProtocolAddress(_nftId);
-        // cover price must be converted from eth to dai if eth
-        //uint256 daiPrice = makerDao.getDai();
-        bytes4 coverCurrency;
-        uint256 coverPrice;
-        address scAddress;
-        uint256 sumAssured;
-
-        (, scAddress, coverCurrency, sumAssured, ) = _getCoverDetails1(_nftId);
-
-        uint256 daiCoverPrice = coverCurrency == DAI_SIG ? coverPrice : _convertEthToDai(coverPrice);
-        // cover price (Dai per second)
+        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, /*validUntil*/, address scAddress, 
+         bytes4 coverCurrency, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = arNFT.getToken(_nftId);
         
-        /**
-         * @notice We need to find protocol then keccak it with staking
-        **/
-        bytes32 protocolWithCurrency = _getProtocolBytes32(scAddress, coverCurrency);
-        //TODO temp
-        uint256 price = 100;
-        planManager.changePrice(protocolWithCurrency, price);
-        
-        IERC721(nftContract).transferFrom(_user, claimManager, _nftId);
+        // coverPrice must be determined by dividing by length.
+        uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
 
+        // Make sure price is in Ether per second.
+        uint256 price = coverCurrency == ETH_SIG ? secondPrice : _convertDaiToEth(secondPrice);
+        
+        bytes32 protocol = _getProtocolBytes32(scAddress, coverCurrency);
+
+        // Update PlanManager to use the correct price for the protocol.
+        // Find price per amount here to update plan manager correctly.
+        uint256 pricePerAmount = price / sumAssured;
+        
+        planManager.changePrice(protocol, pricePerAmount);
+        
+        arNFT.transferFrom(_user, claimManager, _nftId);
+
+        // Save owner of NFT.
         nftOwners[_nftId] = _user;
+        
+        // Save current price (Ether per second) of NFT.
+        nftPrices[_nftId] = price;
 
-        _addCovers(_user, sumAssured, daiCoverPrice, protocolWithCurrency);
+        _addCovers(_user, sumAssured, price, protocol);
+        
+        emit StakedNFT(_user, protocol, _nftId, sumAssured, coverPeriod, block.timestamp);
     }
 
     function _getProtocolBytes32(address _protocol, bytes4 coverCurrency) internal returns(bytes32) {
-        return keccak256(abi.encodePacked(_protocol,coverCurrency));
+        return keccak256(abi.encodePacked(_protocol, coverCurrency));
     }
 
     function _getProtocolAddress(uint256 _coverId) internal returns(address) {
@@ -178,11 +197,12 @@ contract StakeManager {
     /**
      * @dev Converts Ether price and 
      */
-    function _convertEthToDai(uint256 _ethAmount)
+    function _convertDaiToEth(uint256 _daiAmount)
       internal
-    returns (uint256) {
-      ///TODO just return for now
-      return _ethAmount;
+    returns (uint256) 
+    {
+        (bytes32 daiPerEth, ) = medianizer.peek();
+        return (_daiAmount * 10 ** 18) / uint256(daiPerEth);
     }
     
     /**

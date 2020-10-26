@@ -3,7 +3,7 @@
 
 pragma solidity ^0.6.0;
 
-import "hardhat/console.sol";
+//import "hardhat/console.sol";
 /**
  * @dev These functions deal with verification of Merkle trees (hash trees),
  */
