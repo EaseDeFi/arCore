@@ -12,9 +12,6 @@ import './PlanManager.sol';
 **/
 contract ClaimManager is Ownable {
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
-    bytes4 public constant DAI_SIG = bytes4(0x44414900);
-    
-    IERC20 public daiContract;
 
     PlanManager public planManager;
 
@@ -24,21 +21,19 @@ contract ClaimManager is Ownable {
     mapping (bytes32 => bool) confirmedHacks;
     
     // Emitted when a new hack has been recorded.
-    event ConfirmedHack(bytes32 indexed hackId, bytes32 indexed protocol, uint256 timestamp);
+    event ConfirmedHack(bytes32 indexed hackId, address indexed protocol, uint256 timestamp);
 
     // Emitted when a user successfully receives a payout.
     event ClaimPayout(bytes32 indexed hackId, address indexed user, uint256 amount);
     
     /**
      * @dev Start the contract off by giving it the address of Nexus Mutual to submit a claim.
-     * @dev _daiContract Address of the Dai contract.
      * @dev _planManager Address of the PlanManager Armor contract.
      * @dev __arNFT Address of the arNFT contract.
     **/
-    constructor(address _daiContract, address _planManager, address _arNFT)
+    constructor(address _planManager, address _arNFT)
       public
     {
-        daiContract = IERC20(_daiContract);
         planManager = PlanManager(_planManager);
         arNFT = IarNFT(_arNFT);
     }
@@ -50,32 +45,21 @@ contract ClaimManager is Ownable {
      * @param _hackTime The given timestamp for when the hack occurred.
      * @notice Make sure this cannot be done twice. I also think this protocol interaction can be simplified.
     **/
-    function redeemClaim(address _protocolAddress, bytes4 _coverCurrency, uint256 _hackTime)
+    function redeemClaim(address _protocol, uint256 _hackTime)
       external
     {
-        bytes32 protocol = keccak256(abi.encodePacked(_protocolAddress, _coverCurrency));
-        
-        bytes32 hackId = keccak256(abi.encodePacked(protocol, _hackTime));
+        bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         
         // Gets the coverage amount of the user at the time the hack happened.
-        uint256 coverage = planManager.checkCoverage(msg.sender, protocol, _hackTime);
+        uint256 coverage = planManager.checkCoverage(msg.sender, _protocol, _hackTime);
         
         require(coverage > 0, "User had no coverage at the time of this hack.");
     
-        // Ether and DAI both have the same decimals (18).
+        // Put Ether into 18 decimal format.
         uint256 payment = coverage * 10 ** 18;
-    
-        // Add Wei to these amounts.
-        if (_coverCurrency == DAI_SIG) {
-            
-            //TODO change to safeTransfer
-            require(daiContract.transfer(msg.sender, payment), "DAI transfer was unsuccessful");
-        
-        } else {
-            
-            msg.sender.transfer(payment);
-        }
+
+        msg.sender.transfer(payment);
 
         emit ClaimPayout(hackId, msg.sender, coverage);
     }
@@ -87,7 +71,7 @@ contract ClaimManager is Ownable {
      * @param _hackTime The timestamp of the hack that occurred.
      * @notice I think this _protocol/_protocolAddress use can be simplified.
     **/
-    function submitNft(uint256 _nftId, bytes32 _protocol, address _protocolAddress, uint256 _hackTime)
+    function submitNft(uint256 _nftId, address _protocol, uint256 _hackTime)
       external
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
@@ -104,7 +88,7 @@ contract ClaimManager is Ownable {
         require(validUntil >= _hackTime, "arNFT was not valid at time of hack.");
 
         // Make sure arNFT protocol matches
-        require(scAddress == _protocolAddress, "arNFT does not cover correct protocol.");
+        require(scAddress == _protocol, "arNFT does not cover correct protocol.");
 
         arNFT.submitClaim(_nftId);
     }
@@ -125,7 +109,7 @@ contract ClaimManager is Ownable {
      * @param _protocol The address of the protocol that has been hacked (address that would be on yNFT).
      * @param _hackTime The timestamp of the time the hack occurred.
     **/
-    function confirmHack(bytes32 _protocol, uint256 _hackTime)
+    function confirmHack(address _protocol, uint256 _hackTime)
       external
       onlyOwner
     {

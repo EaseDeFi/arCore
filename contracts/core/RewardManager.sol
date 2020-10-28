@@ -129,7 +129,9 @@ contract RewardManager is Ownable {
       view
     returns (uint256)
     {
-        //updateStake()
+        // We used to be able to change state within view functions and need to replicate this somehow
+        // to get the
+        //updateStake(_user);
         return balances[_user];
     }
     
@@ -187,11 +189,10 @@ contract RewardManager is Ownable {
             
             Deposit memory curDeposit = deposits[i];
             //CHECK: how to get _coverAmount?
-            uint256 _coverAmount = 10; 
             // Example with simple numbers, 10 is a buffer to ensure we don't divide by too big of a number.
             // reward = ( ( 1 * 10 ) / 2 ) * 2 ) / 10
             uint256 buffer = 1e18;
-            reward = reward.add( ( ( ( _coverAmount * buffer ) / curDeposit.curTotalPrice ) * curDeposit.amount ) / buffer );    
+            reward = reward.add( ( ( ( _userStakedCost * buffer ) / curDeposit.curTotalPrice ) * curDeposit.amount ) / buffer );    
         
         }
     }

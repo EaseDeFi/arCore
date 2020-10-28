@@ -13,20 +13,19 @@ contract PlanManager {
     
     // StakeManager calls this when a new NFT is added to update what the price for that protocol is.
     // Cover price in ETH (1e18) of price per second per DAI covered.
-    // CHECK: is it ok to keccak(protocol, coverCurrency)?
-    mapping (bytes32 => uint256) public ynftCoverPrice;
+    mapping (address => uint256) public nftCoverPrice;
     
     // Mapping to keep track of how much coverage we've sold for each protocol.
-    // keccak256(protocol, coverCurrency) => total borrowed cover
-    mapping (bytes32 => uint256) public totalBorrowedAmount;
+    // smart contract address => total borrowed cover
+    mapping (address => uint256) public totalBorrowedAmount;
 
-    mapping (bytes32 => uint256) public totalUsedCover;
+    mapping (address => uint256) public totalUsedCover;
     
     // The amount of markup for Armor's service vs. the original cover cost.
     uint256 public markup;
     
     // Event to notify frontend of plan update.
-    event PlanUpdate(address indexed user, bytes32[] protocols, uint256[] amounts);
+    event PlanUpdate(address indexed user, address[] protocols, uint256[] amounts);
 
     StakeManager public stakeManager;
     BalanceManager public balanceManager;
@@ -48,6 +47,7 @@ contract PlanManager {
     ) public {
         stakeManager = StakeManager(_stakeManager);
         balanceManager = BalanceManager(_balanceManager);
+        markup = 2;
     }
 
     modifier onlyStakeManager() {
@@ -61,12 +61,13 @@ contract PlanManager {
      * @param _coverAmounts The amount of coverage desired in FULL DAI (0 decimals).
      * @notice Let's simplify this somehow--even just splitting into different functions.
     **/
-    function updatePlan(bytes32[] calldata _oldProtocols, uint256[] calldata _oldCoverAmounts, bytes32[] calldata _protocols, uint256[] calldata _coverAmounts)
+    function updatePlan(address[] calldata _oldProtocols, uint256[] calldata _oldCoverAmounts, address[] calldata _protocols, uint256[] calldata _coverAmounts)
       external
     {
         // Need to get price of the protocol here
         require(_protocols.length == _coverAmounts.length, "Input array lengths do not match.");
         Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
+        
         require(_generateMerkleRoot(_oldProtocols, _oldCoverAmounts) == lastPlan.merkleRoot, "Invalid old values merkleRoot different");
         address user = msg.sender;
         
@@ -78,8 +79,8 @@ contract PlanManager {
         
         // Loop through protocols, find price per second, add to rate, add coverage amount to mapping.
         for (uint256 i = 0; i < _protocols.length; i++) {
-            // Amount of DAI that must be paid per DAI of coverage per second.
-            uint256 pricePerSec = ynftCoverPrice[ _protocols[i] ] * _coverAmounts[i] * _markup;
+            // Amount of Ether that must be paid per DAI of coverage per second.
+            uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i] * _markup;
             newPricePerSec += pricePerSec;
         }
 
@@ -99,13 +100,15 @@ contract PlanManager {
         
         // update balance price per second here
         balanceManager.changePrice(user, newPricePerSec);
-        // They get the same price per second as long as they ke
-        
+
         emit PlanUpdate(msg.sender, _protocols, _coverAmounts);
     }
 
     // should be sorted merkletree. should be calculated off chain
-    function _generateMerkleRoot(bytes32[] memory _protocols, uint256[] memory _coverAmounts) internal returns (bytes32){
+    function _generateMerkleRoot(address[] memory _protocols, uint256[] memory _coverAmounts) 
+      internal 
+      pure
+    returns (bytes32){
         require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
         bytes32[] memory leaves = new bytes32[](_protocols.length);
         for(uint256 i = 0 ; i<_protocols.length; i++){
@@ -119,16 +122,12 @@ contract PlanManager {
      * @dev Update the contract-wide totals for each protocol that has changed.
      * @notice I don't like this, how can it be better?
     **/
-    function updateTotals(bytes32[] memory _oldProtocols, uint256[] memory _oldCoverAmounts, bytes32[] memory _newProtocols, uint256[] memory _newCoverAmounts)
+    function updateTotals(address[] memory _oldProtocols, uint256[] memory _oldCoverAmounts, address[] memory _newProtocols, uint256[] memory _newCoverAmounts)
       internal
     {
-        // Loop through all last covered protocols and amounts
-        //mapping(bytes32=>uint256) memory oldCoverAmounts = _oldPlan.coverAmounts;
-        //uint256[] memory oldProtocols = _oldPlan.protocols;
-    
         // First go through and subtract all old cover amounts.
         for (uint256 i = 0; i < _oldProtocols.length; i++) {
-            bytes32 protocol = _oldProtocols[i];
+            address protocol = _oldProtocols[i];
             totalUsedCover[protocol] -= _oldCoverAmounts[i];
         }
         
@@ -143,11 +142,11 @@ contract PlanManager {
     /**
      * @dev Used by ClaimManager to check how much coverage the user had at the time of a hack.
      * @param _user The user to check coverage for.
-     * @param _protocol The address of the protocol that was hacked. (Address used according to yNFT).
+     * @param _protocol The address of the protocol that was hacked. (Address used according to arNFT).
      * @param _hackTime The timestamp of when a hack happened.
      * return The amount of coverage the user had at the time--0 if none.
     **/
-    function checkCoverage(address _user, bytes32 _protocol, uint256 _hackTime)
+    function checkCoverage(address _user, address _protocol, uint256 _hackTime)
       external
       // Make sure we update balance if needed
     returns (uint256)
@@ -178,14 +177,14 @@ contract PlanManager {
     
     /**
      * @dev Armor has the ability to change the price that a user is paying for their insurance.
-     * @param _protocol The protocol whose yNFT price is being updated.
+     * @param _protocol The protocol whose arNFT price is being updated.
      * @param _newPrice the new price PER BLOCK that the user will be paying.
     **/
-    function changePrice(bytes32 _protocol, uint256 _newPrice)
+    function changePrice(address _protocol, uint256 _newPrice)
       external
       onlyStakeManager
     {
-        ynftCoverPrice[_protocol] = _newPrice;
+        nftCoverPrice[_protocol] = _newPrice;
     }
     
 }
