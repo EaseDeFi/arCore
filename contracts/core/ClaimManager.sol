@@ -4,7 +4,7 @@ import '../general/Ownable.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
-import './PlanManager.sol';
+import '../interfaces/IPlanManager.sol';
 
 /**
  * @dev This contract holds all NFTs. The only time it does something is if a user requests a claim.
@@ -13,7 +13,7 @@ import './PlanManager.sol';
 contract ClaimManager is Ownable {
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
 
-    PlanManager public planManager;
+    IPlanManager public planManager;
 
     IarNFT public arNFT;
 
@@ -31,10 +31,11 @@ contract ClaimManager is Ownable {
      * @dev _planManager Address of the PlanManager Armor contract.
      * @dev __arNFT Address of the arNFT contract.
     **/
-    constructor(address _planManager, address _arNFT)
+    function initialize(address _planManager, address _arNFT)
       public
     {
-        planManager = PlanManager(_planManager);
+        require(planManager == IPlanManager( address(0) ), "Contract already initialized.");
+        planManager = IPlanManager(_planManager);
         arNFT = IarNFT(_arNFT);
     }
     

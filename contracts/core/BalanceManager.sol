@@ -39,9 +39,10 @@ contract BalanceManager is Ownable {
     /**
      * @param _planManager Address of the PlanManager contract.
      **/
-    constructor(address _planManager)
-    public
+    function initialize(address _planManager)
+      external
     {
+        require(planManager == address(0), "Contract already initialized.");
         planManager = _planManager;
     }
 

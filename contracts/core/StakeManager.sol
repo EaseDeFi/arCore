@@ -4,8 +4,8 @@ import '../general/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
-import './RewardManager.sol';
-import './PlanManager.sol';
+import '../interfaces/IRewardManager.sol';
+import '../interfaces/IPlanManager.sol';
 import '../general/Ownable.sol';
 
 /**
@@ -26,8 +26,8 @@ contract StakeManager is Ownable {
     IERC20 public daiContract;
 
     // internal contract addresses 
-    RewardManager public rewardManager;
-    PlanManager public planManager;
+    IRewardManager public rewardManager;
+    IPlanManager public planManager;
     // All NFTs will be immediately sent to the claim manager.
     address public claimManager;
     
@@ -54,12 +54,13 @@ contract StakeManager is Ownable {
      * @dev Construct the contract with the yNft contract.
      * @param _nftContract Address of the yNft contract.
     **/
-    constructor(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
+    function initialize(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
       public
     {
+        require(arNFT == IarNFT( address(0) ), "Contract already initialized.");
         arNFT = IarNFT(_nftContract);
-        rewardManager = RewardManager(_rewardManager);
-        planManager = PlanManager(_planManager);
+        rewardManager = IRewardManager(_rewardManager);
+        planManager = IPlanManager(_planManager);
         claimManager = _claimManager;
     }
     

@@ -1,6 +1,6 @@
 pragma solidity ^0.6.6;
-import './StakeManager.sol';
-import './BalanceManager.sol';
+import '../interfaces/IStakeManager.sol';
+import '../interfaces/IBalanceManager.sol';
 import '../general/MerkleProof.sol';
 
 /**
@@ -25,28 +25,25 @@ contract PlanManager {
     uint256 public markup;
     
     // Event to notify frontend of plan update.
-    event PlanUpdate(address indexed user, address[] protocols, uint256[] amounts);
+    event PlanUpdate(address indexed user, address[] protocols, uint256[] amounts, uint256 endTime);
 
-    StakeManager public stakeManager;
-    BalanceManager public balanceManager;
+    IStakeManager public stakeManager;
+    IBalanceManager public balanceManager;
     
     // Mapping = protocol => cover amount
-    /**
-     * @notice  Does this timestamp need to be over a certain amount of time?
-     *          this may be able to be put off for now.
-    **/
     struct Plan {
         uint128 startTime;
         uint128 endTime;
         bytes32 merkleRoot;
     }
 
-    constructor(
+    function initialize(
         address _stakeManager,
         address _balanceManager
     ) public {
-        stakeManager = StakeManager(_stakeManager);
-        balanceManager = BalanceManager(_balanceManager);
+        require(stakeManager == IStakeManager( address(0)), "Contract already initialized.");
+        stakeManager = IStakeManager(_stakeManager);
+        balanceManager = IBalanceManager(_balanceManager);
         markup = 2;
     }
 
@@ -101,14 +98,16 @@ contract PlanManager {
         // update balance price per second here
         balanceManager.changePrice(user, newPricePerSec);
 
-        emit PlanUpdate(msg.sender, _protocols, _coverAmounts);
+        emit PlanUpdate(msg.sender, _protocols, _coverAmounts, endTime);
     }
 
     // should be sorted merkletree. should be calculated off chain
     function _generateMerkleRoot(address[] memory _protocols, uint256[] memory _coverAmounts) 
       internal 
       pure
-    returns (bytes32){
+    returns (bytes32)
+    
+    {
         require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
         bytes32[] memory leaves = new bytes32[](_protocols.length);
         for(uint256 i = 0 ; i<_protocols.length; i++){

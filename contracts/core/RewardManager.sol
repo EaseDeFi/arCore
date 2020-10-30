@@ -3,7 +3,7 @@ pragma solidity ^0.6.6;
 import '../general/SafeMath.sol';
 import '../general/Ownable.sol';
 import '../interfaces/IERC20.sol';
-import './StakeManager.sol';
+import '../interfaces/IStakeManager.sol';
 
 /**
  * @dev RewardManager keeps track of reward balances that yNFT stakers receive. They will be deposited as ARMOR.
@@ -12,8 +12,8 @@ contract RewardManager is Ownable {
     
     using SafeMath for uint;
     
-    IERC20 public armorToken;
-    StakeManager public stakeManager;
+    // IERC20 public armorToken;
+    IStakeManager public stakeManager;
     
     // Deposits list keeps track of all deposits made.
     // To keep this somewhat clean, we will only be able to deposit a max of once a day.
@@ -43,11 +43,12 @@ contract RewardManager is Ownable {
     /**
      * @dev Must have LendManager contract to get user balances.
     **/
-    constructor(address _stakeManager, address _armorToken)
-      public
+    function initialize(address _stakeManager/*, address _armorToken*/)
+      external
     {
-        stakeManager = StakeManager(_stakeManager);
-        armorToken = IERC20(_armorToken);
+        require(stakeManager == IStakeManager( address(0) ), "Contract already initialized.");
+        stakeManager = IStakeManager(_stakeManager);
+        // armorToken = IERC20(_armorToken);
     }
 
     modifier onlyStakeManager() {
@@ -62,14 +63,15 @@ contract RewardManager is Ownable {
     function withdraw(uint256 _amount)
       external
     {
-        address user = msg.sender;
+        address payable user = msg.sender;
 
         updateStake(user);
 
         // Will throw if not enough.        
         balances[user] = balances[user].sub(_amount);
 
-        armorToken.transfer(user, _amount);
+        //armorToken.transfer(user, _amount);
+        user.transfer(_amount);
     }
     
     /**
@@ -108,15 +110,15 @@ contract RewardManager is Ownable {
     
     /**
      * @dev Deposit tokens to be staked. This is onlyOwner so malicious actors cannot spam the list.
-     * @param _amount The amount of ARMOR to be deposited.
     **/
-    function deposit(uint256 _amount)
+    function deposit(/*uint256 _amount*/)
       external
+      payable
       onlyOwner
     {
-        require(armorToken.transferFrom(msg.sender, address(this), _amount), "ARMOR deposit was unsuccessful.");
+        //require(armorToken.transferFrom(msg.sender, address(this), _amount), "ARMOR deposit was unsuccessful.");
         
-        Deposit memory newDeposit = Deposit(totalStakedPrice, _amount, now);
+        Deposit memory newDeposit = Deposit(totalStakedPrice, /*_amount*/ msg.value, now);
         deposits.push(newDeposit);
     }
     
@@ -127,12 +129,19 @@ contract RewardManager is Ownable {
     function balanceOf(address _user)
       external
       view
-    returns (uint256)
+    returns (uint256 balance)
     {
-        // We used to be able to change state within view functions and need to replicate this somehow
-        // to get the
-        //updateStake(_user);
-        return balances[_user];
+        uint256 index = lastIndex[_user];
+        
+        // If user has been staking and is not updated, update reward, otherwise just update index.
+        if (index != 0 && index != deposits.length - 1) {
+            
+            uint256 coverCost = userStakedPrice[_user];
+            uint256 reward = calculateReward(coverCost, index);
+            
+            balance = balances[_user].add(reward);
+        
+        }
     }
     
     /**
