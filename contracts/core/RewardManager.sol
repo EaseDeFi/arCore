@@ -40,6 +40,8 @@ contract RewardManager is Ownable {
         uint256 timestamp;
     }
     
+    receive() external payable {
+    } 
     /**
      * @dev Must have LendManager contract to get user balances.
     **/
@@ -172,7 +174,6 @@ contract RewardManager is Ownable {
      * @param _user The user to subtract stake from.
      * @param _secondPrice The price of the cover per second.
     **/
-    //CHECK: changed name addStakes -> subStakes(temporary)
     function subStakes(address _user, uint256 _secondPrice)
       external
       onlyStakeManager
