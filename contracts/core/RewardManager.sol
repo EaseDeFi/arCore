@@ -5,6 +5,7 @@ import '../general/Ownable.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IStakeManager.sol';
 
+import 'hardhat/console.sol';
 /**
  * @dev RewardManager keeps track of reward balances that yNFT stakers receive. They will be deposited as ARMOR.
 **/
@@ -29,7 +30,7 @@ contract RewardManager is Ownable {
     mapping (address => uint256) public balances;
     
     // The last `deposits` index that the user updated on.
-    mapping (address => uint256) public lastIndex;
+    mapping (address => uint256) public nextIndex;
     
     // Deposit struct for every time a deposit of ARMOR tokens is made.
     // This will stream into an account over 24 hours.
@@ -39,9 +40,12 @@ contract RewardManager is Ownable {
         uint256 amount;
         uint256 timestamp;
     }
+
+    modifier updateRewards(address _user) {
+        updateStake(_user);
+        _;
+    }
     
-    receive() external payable {
-    } 
     /**
      * @dev Must have LendManager contract to get user balances.
     **/
@@ -51,7 +55,6 @@ contract RewardManager is Ownable {
         Ownable.initialize();
         require(stakeManager == IStakeManager( address(0) ), "Contract already initialized.");
         stakeManager = IStakeManager(_stakeManager);
-        // armorToken = IERC20(_armorToken);
     }
 
     modifier onlyStakeManager() {
@@ -65,12 +68,11 @@ contract RewardManager is Ownable {
     **/
     function withdraw(uint256 _amount)
       external
+      updateRewards(msg.sender)
     {
         address payable user = msg.sender;
-        updateStake(user);
         // Will throw if not enough.        
         balances[user] = balances[user].sub(_amount);
-
         //armorToken.transfer(user, _amount);
         user.transfer(_amount);
     }
@@ -82,18 +84,16 @@ contract RewardManager is Ownable {
     function updateStake(address _user)
       public
     {
-        uint256 index = lastIndex[_user];
+        uint256 index = nextIndex[_user];
         
         // If user has been staking and is not updated, update reward, otherwise just update index.
-        if (index != 0 && index != deposits.length - 1) {
-            
+        if (index != 0 && index != deposits.length) {
             uint256 coverCost = userStakedPrice[_user];
             uint256 reward = calculateReward(coverCost, index);
-            
             balances[_user] = balances[_user].add(reward);
         }
         
-        lastIndex[_user] = deposits.length - 1;
+        nextIndex[_user] = deposits.length;
     }
     
     /**
@@ -116,8 +116,7 @@ contract RewardManager is Ownable {
       payable
       onlyOwner
     {
-        //require(armorToken.transferFrom(msg.sender, address(this), _amount), "ARMOR deposit was unsuccessful.");
-        
+        require(msg.value > 0, "deposit amount should be larger than zero");
         Deposit memory newDeposit = Deposit(totalStakedPrice, /*_amount*/ msg.value, now);
         deposits.push(newDeposit);
     }
@@ -131,16 +130,14 @@ contract RewardManager is Ownable {
       view
     returns (uint256 balance)
     {
-        uint256 index = lastIndex[_user];
-        
+        uint256 index = nextIndex[_user];
+        balance = balances[_user];
+         
         // If user has been staking and is not updated, update reward, otherwise just update index.
-        if (index != 0 && index != deposits.length - 1) {
-            
+        if (index != 0 && index != deposits.length) {
             uint256 coverCost = userStakedPrice[_user];
             uint256 reward = calculateReward(coverCost, index);
-            
-            balance = balances[_user].add(reward);
-        
+            balance = balance.add(reward);
         }
     }
     
@@ -164,6 +161,7 @@ contract RewardManager is Ownable {
     function addStakes(address _user, uint256 _secondPrice)
       external
       onlyStakeManager
+      updateRewards(_user)
     {
         userStakedPrice[_user] = userStakedPrice[_user].add(_secondPrice);
         totalStakedPrice = totalStakedPrice.add(_secondPrice);
@@ -177,6 +175,7 @@ contract RewardManager is Ownable {
     function subStakes(address _user, uint256 _secondPrice)
       external
       onlyStakeManager
+      updateRewards(_user)
     {
         userStakedPrice[_user] = userStakedPrice[_user].sub(_secondPrice);
         totalStakedPrice = totalStakedPrice.sub(_secondPrice);
@@ -193,14 +192,13 @@ contract RewardManager is Ownable {
     returns (uint256 reward)
     {
         // Loop through each new deposit and figure out what the reward for each deposit was.
-        for (uint256 i = _lastIndex + 1; i < deposits.length; i++) {
+        for (uint256 i = _lastIndex; i < deposits.length; i++) {
             Deposit memory curDeposit = deposits[i];
             //CHECK: how to get _coverAmount?
             // Example with simple numbers, 10 is a buffer to ensure we don't divide by too big of a number.
             // reward = ( ( 1 * 10 ) / 2 ) * 2 ) / 10
             uint256 buffer = 1e18;
-            reward = reward.add( ( ( ( _userStakedCost * buffer ) / curDeposit.curTotalPrice ) * curDeposit.amount ) / buffer );    
+            reward = reward.add( ( _userStakedCost * buffer  * curDeposit.amount) / (curDeposit.curTotalPrice * buffer ));    
         }
     }
-    
 }
