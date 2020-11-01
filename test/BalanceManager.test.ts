@@ -4,14 +4,16 @@ import { Contract, Signer, BigNumber, constants } from "ethers";
 describe("BalanceManager", function () {
   let accounts: Signer[];
   let balanceManager: Contract;
-  let planManager: Signer;
+  let planManager: Contract;
   let user: Signer;
   beforeEach(async function () {
     const BalanceFactory = await ethers.getContractFactory("BalanceManager");
     accounts = await ethers.getSigners();
-    planManager = accounts[4];
+    const PlanFactory = await ethers.getContractFactory("PlanManagerMock");
+    planManager = await PlanFactory.deploy();
     user = accounts[3];
     balanceManager = await BalanceFactory.deploy();
+    await balanceManager.initialize(planManager.address);
   });
 
   describe("#deposit()", function () {
@@ -65,12 +67,10 @@ describe("BalanceManager", function () {
   describe("#changePrice()", function () {
     const newPrice = ethers.BigNumber.from("10000");
     it("should fail if msg.sender is not plan manager", async function(){
-      await balanceManager.initialize(await planManager.getAddress());
       await expect(balanceManager.connect(user).changePrice(await user.getAddress(),newPrice)).to.be.reverted;
     });
     it("should update perSecondPrice when updated", async function(){
-      await balanceManager.initialize(await planManager.getAddress());
-      await balanceManager.connect(planManager).changePrice(await user.getAddress(),newPrice);
+      await planManager.changePrice(balanceManager.address, await user.getAddress(),newPrice);
       const price = (await balanceManager.balances(user.getAddress())).perSecondPrice;
       expect(price.toString()).to.equal(newPrice.toString());
     });

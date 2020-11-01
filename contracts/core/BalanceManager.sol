@@ -169,6 +169,6 @@ contract BalanceManager is Ownable, IBalanceManager{
     function notifyBalanceChange(address _user) 
     internal
     {
-        IPlanManager(planManager).updateExpireTime(_user, balances[_user].lastBalance); 
+        IPlanManager(planManager).updateExpireTime(_user, balances[_user].lastBalance, balances[_user].perSecondPrice); 
     }
 }

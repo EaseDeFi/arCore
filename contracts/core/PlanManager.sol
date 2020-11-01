@@ -30,7 +30,6 @@ contract PlanManager is IPlanManager {
         uint128 startTime;
         uint128 endTime;
         bytes32 merkleRoot;
-        uint256 pricePerSec;
     }
 
     IStakeManager public stakeManager;
@@ -115,7 +114,7 @@ contract PlanManager is IPlanManager {
         
         bytes32 merkleRoot = _generateMerkleRoot(_protocols, _coverAmounts);
         Plan memory newPlan;
-        newPlan = Plan(uint128(now), uint128(endTime), merkleRoot, newPricePerSec);
+        newPlan = Plan(uint128(now), uint128(endTime), merkleRoot);
         plans[msg.sender].push(newPlan);
         
         // update balance price per second here
@@ -200,14 +199,14 @@ contract PlanManager is IPlanManager {
         nftCoverPrice[_protocol] = _newPrice;
     }
 
-    function updateExpireTime(address _user, uint256 _balance)
+    function updateExpireTime(address _user, uint256 _balance, uint256 _pricePerSec)
       external
       override
       onlyBalanceManager
     {
         Plan storage plan = plans[_user][plans[_user].length-1];
         if(plan.endTime >= now){
-            plan.endTime = uint128(_balance / plan.pricePerSec + now);
+            plan.endTime = uint128(_balance / _pricePerSec + now);
         }
     }
 }
