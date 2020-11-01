@@ -14,7 +14,7 @@ contract BalanceManager is Ownable, IBalanceManager{
 
     using SafeMath for uint;
 
-    address public planManager;
+    IPlanManager public planManager;
 
     // keep track of monthly payments and start/end of those
     mapping (address => Balance) public balances;
@@ -46,8 +46,8 @@ contract BalanceManager is Ownable, IBalanceManager{
       override
     {
         Ownable.initialize();
-        require(planManager == address(0), "Contract already initialized.");
-        planManager = _planManager;
+        require(address(planManager) == address(0), "Contract already initialized.");
+        planManager = IPlanManager(_planManager);
     }
 
     /**
@@ -169,6 +169,6 @@ contract BalanceManager is Ownable, IBalanceManager{
     function notifyBalanceChange(address _user) 
     internal
     {
-        IPlanManager(planManager).updateExpireTime(_user, balances[_user].lastBalance, balances[_user].perSecondPrice); 
+        planManager.updateExpireTime(_user, balances[_user].lastBalance, balances[_user].perSecondPrice); 
     }
 }
