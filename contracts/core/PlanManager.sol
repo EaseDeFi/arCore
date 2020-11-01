@@ -2,11 +2,12 @@ pragma solidity ^0.6.6;
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../general/MerkleProof.sol';
-
+import '../interfaces/IPlanManager.sol';
+import 'hardhat/console.sol';
 /**
  * @dev Separating this off to specifically keep track of a borrower's plans.
 **/
-contract PlanManager {
+contract PlanManager is IPlanManager {
     
     // List of plans that a user has purchased so there is a historical record.
     mapping (address => Plan[]) public plans;
@@ -24,24 +25,22 @@ contract PlanManager {
     // The amount of markup for Armor's service vs. the original cover cost.
     uint256 public markup;
     
-    // Event to notify frontend of plan update.
-    event PlanUpdate(address indexed user, address[] protocols, uint256[] amounts, uint256 endTime);
-
-    IStakeManager public stakeManager;
-    IBalanceManager public balanceManager;
-    
     // Mapping = protocol => cover amount
     struct Plan {
         uint128 startTime;
         uint128 endTime;
         bytes32 merkleRoot;
+        uint256 pricePerSec;
     }
 
+    IStakeManager public stakeManager;
+    IBalanceManager public balanceManager;
+    
     function initialize(
         address _stakeManager,
         address _balanceManager
-    ) public {
-        require(stakeManager == IStakeManager( address(0)), "Contract already initialized.");
+    ) external override {
+        require(stakeManager == IStakeManager(address(0)), "Contract already initialized.");
         stakeManager = IStakeManager(_stakeManager);
         balanceManager = IBalanceManager(_balanceManager);
         markup = 2;
@@ -51,8 +50,27 @@ contract PlanManager {
         require(msg.sender == address(stakeManager), "Only StakeManager can call this function");
         _;
     }
+
+    modifier onlyBalanceManager() {
+        require(msg.sender == address(balanceManager), "Only BalanceManager can call this function");
+        _;
+    }
+
+    function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end,  bytes32 root){
+        Plan memory plan = plans[_user][plans[_user].length-1];
+        //return 0 if there is no active plan
+        if(plan.endTime < now){
+            start = 0;
+            end = 0;
+            root = bytes32(0);
+        } else {
+            start = plan.startTime;
+            end = plan.endTime;
+            root = plan.merkleRoot;
+        }
+    }
     
-    /**
+    /*
      * @dev User can update their plan for cover amount on any protocol.
      * @param _protocols Addresses of the protocols that we want coverage for.
      * @param _coverAmounts The amount of coverage desired in FULL DAI (0 decimals).
@@ -60,23 +78,31 @@ contract PlanManager {
     **/
     function updatePlan(address[] calldata _oldProtocols, uint256[] calldata _oldCoverAmounts, address[] calldata _protocols, uint256[] calldata _coverAmounts)
       external
+      override
     {
         // Need to get price of the protocol here
         require(_protocols.length == _coverAmounts.length, "Input array lengths do not match.");
-        Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
-        
-        require(_generateMerkleRoot(_oldProtocols, _oldCoverAmounts) == lastPlan.merkleRoot, "Invalid old values merkleRoot different");
-        address user = msg.sender;
-        
-        // This reverts on not enough cover. Only do check in actual update to avoid multiple loops checking coverage.
-        updateTotals(_oldProtocols, _oldCoverAmounts, _protocols, _coverAmounts);
-        
+        if(plans[msg.sender].length > 0){
+          Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
+
+          require(_generateMerkleRoot(_oldProtocols, _oldCoverAmounts) == lastPlan.merkleRoot, "Invalid old values merkleRoot different");
+          // First go through and subtract all old cover amounts.
+          _removeOldTotals(_oldProtocols, _oldCoverAmounts);
+          // Then go through, add new cover amounts, and make sure they do not pass cover allowed.
+          _addNewTotals(_protocols, _coverAmounts);
+          // Set old plan to have ended now.
+          lastPlan.endTime = uint128(now);
+        } else {
+          _addNewTotals(_protocols, _coverAmounts);
+        }
+
         uint256 newPricePerSec;
         uint256 _markup = markup;
-        
         // Loop through protocols, find price per second, add to rate, add coverage amount to mapping.
         for (uint256 i = 0; i < _protocols.length; i++) {
             // Amount of Ether that must be paid per DAI of coverage per second.
+            //check if nftCoverPrice is not zero
+            require(nftCoverPrice[_protocols[i]] != 0, "Protocol is not supported");
             uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i] * _markup;
             newPricePerSec += pricePerSec;
         }
@@ -84,19 +110,16 @@ contract PlanManager {
         /**
          * @dev can for sure separate this shit into another function.
         **/
-        uint256 balance = balanceManager.balanceOf(user);
+        uint256 balance = balanceManager.balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;
         
-        // Set old plan to have ended now.
-        lastPlan.endTime = uint128(block.timestamp);
-
         bytes32 merkleRoot = _generateMerkleRoot(_protocols, _coverAmounts);
         Plan memory newPlan;
-        newPlan = Plan(uint128(now), uint128(endTime), merkleRoot);
-        plans[user].push(newPlan);
+        newPlan = Plan(uint128(now), uint128(endTime), merkleRoot, newPricePerSec);
+        plans[msg.sender].push(newPlan);
         
         // update balance price per second here
-        balanceManager.changePrice(user, newPricePerSec);
+        balanceManager.changePrice(msg.sender, newPricePerSec);
 
         emit PlanUpdate(msg.sender, _protocols, _coverAmounts, endTime);
     }
@@ -119,22 +142,19 @@ contract PlanManager {
     
     /**
      * @dev Update the contract-wide totals for each protocol that has changed.
-     * @notice I don't like this, how can it be better?
     **/
-    function updateTotals(address[] memory _oldProtocols, uint256[] memory _oldCoverAmounts, address[] memory _newProtocols, uint256[] memory _newCoverAmounts)
-      internal
-    {
-        // First go through and subtract all old cover amounts.
+    function _removeOldTotals(address[] memory _oldProtocols, uint256[] memory _oldCoverAmounts) internal{
         for (uint256 i = 0; i < _oldProtocols.length; i++) {
             address protocol = _oldProtocols[i];
             totalUsedCover[protocol] -= _oldCoverAmounts[i];
         }
-        
-        // Then go through, add new cover amounts, and make sure they do not pass cover allowed.
+    }
+
+    function _addNewTotals(address[] memory _newProtocols, uint256[] memory _newCoverAmounts) internal {
         for (uint256 i = 0; i < _newProtocols.length; i++) {
             totalUsedCover[_newProtocols[i]] += _newCoverAmounts[i];
             // Check StakeManager to ensure the new total amount does not go above the staked amount.
-            require(stakeManager.allowedCover(_newProtocols[i], totalUsedCover[_newProtocols[i]]));
+            require(stakeManager.allowedCover(_newProtocols[i], totalUsedCover[_newProtocols[i]]), "Exceeds total cover amount");
         }
     }
     
@@ -145,33 +165,26 @@ contract PlanManager {
      * @param _hackTime The timestamp of when a hack happened.
      * return The amount of coverage the user had at the time--0 if none.
     **/
-    function checkCoverage(address _user, address _protocol, uint256 _hackTime)
+    function checkCoverage(address _user, address _protocol, uint256 _hackTime, uint256 _amount, bytes32[] calldata _path)
       external
+      view
+      override
       // Make sure we update balance if needed
-    returns (uint256)
+    returns (bool)
     {
         // This may be more gas efficient if we don't grab this first but instead grab each plan from storage individually?
         Plan[] memory planArray = plans[_user];
         
         // In normal operation, this for loop should never get too big.
         // If it does (from malicious action), the user will be the only one to suffer.
-        for (uint256 i = planArray.length - 1; i >= 0; i--) {
-            
-            Plan memory plan = planArray[i];
-            
+        for (int256 i = int256(planArray.length - 1); i >= 0; i--) {
+            Plan memory plan = planArray[uint256(i)];
             // Only one plan will be active at the time of a hack--return cover amount from then.
-            if (_hackTime >= plan.startTime && _hackTime <= plan.endTime) {
-                
-                // TODO: Needs to be replaced with Merkle
-                /*uint256 coverAmount = plan.coverAmounts[_protocol];
-                plan.coverAmounts[_protocol] = 0;
-                return coverAmount;*/
-            
+            if (_hackTime >= plan.startTime && _hackTime < plan.endTime) {
+                return MerkleProof.verify(_path, plan.merkleRoot, keccak256(abi.encodePacked(_protocol, _amount)));
             }
-            
         }
-        
-        return 0;
+        return false;
     }
     
     /**
@@ -181,9 +194,20 @@ contract PlanManager {
     **/
     function changePrice(address _protocol, uint256 _newPrice)
       external
+      override
       onlyStakeManager
     {
         nftCoverPrice[_protocol] = _newPrice;
     }
-    
+
+    function updateExpireTime(address _user, uint256 _balance)
+      external
+      override
+      onlyBalanceManager
+    {
+        Plan storage plan = plans[_user][plans[_user].length-1];
+        if(plan.endTime >= now){
+            plan.endTime = uint128(_balance / plan.pricePerSec + now);
+        }
+    }
 }

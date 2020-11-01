@@ -46,6 +46,7 @@ contract RewardManager is Ownable {
     function initialize(address _stakeManager/*, address _armorToken*/)
       external
     {
+        Ownable.initialize();
         require(stakeManager == IStakeManager( address(0) ), "Contract already initialized.");
         stakeManager = IStakeManager(_stakeManager);
         // armorToken = IERC20(_armorToken);
@@ -64,9 +65,7 @@ contract RewardManager is Ownable {
       external
     {
         address payable user = msg.sender;
-
         updateStake(user);
-
         // Will throw if not enough.        
         balances[user] = balances[user].sub(_amount);
 
@@ -90,7 +89,6 @@ contract RewardManager is Ownable {
             uint256 reward = calculateReward(coverCost, index);
             
             balances[_user] = balances[_user].add(reward);
-        
         }
         
         lastIndex[_user] = deposits.length - 1;
@@ -195,14 +193,12 @@ contract RewardManager is Ownable {
     {
         // Loop through each new deposit and figure out what the reward for each deposit was.
         for (uint256 i = _lastIndex + 1; i < deposits.length; i++) {
-            
             Deposit memory curDeposit = deposits[i];
             //CHECK: how to get _coverAmount?
             // Example with simple numbers, 10 is a buffer to ensure we don't divide by too big of a number.
             // reward = ( ( 1 * 10 ) / 2 ) * 2 ) / 10
             uint256 buffer = 1e18;
             reward = reward.add( ( ( ( _userStakedCost * buffer ) / curDeposit.curTotalPrice ) * curDeposit.amount ) / buffer );    
-        
         }
     }
     

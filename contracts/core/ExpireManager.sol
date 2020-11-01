@@ -5,7 +5,6 @@ pragma solidity ^0.6.6;
  * @dev Keeps track of NFTs to allow us to easily remove them from coverage when they expire.
 **/
 contract NFTInfo {
-    
     // 1 day for each step.
     uint96 public constant BUCKET_STEP = 86400;
 
@@ -176,7 +175,6 @@ contract NFTInfo {
             // no more nft left... good bye
             tail = 0;
         }
-        
         return popped;
     }
     
