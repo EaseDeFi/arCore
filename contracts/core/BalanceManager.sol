@@ -3,19 +3,21 @@ pragma solidity ^0.6.6;
 import '../general/SafeMath.sol';
 import '../general/Ownable.sol';
 import '../interfaces/IERC20.sol';
-
+import '../interfaces/IBalanceManager.sol';
+import '../interfaces/IPlanManager.sol';
+import 'hardhat/console.sol';
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
  **/
-contract BalanceManager is Ownable {
+contract BalanceManager is Ownable, IBalanceManager{
 
     using SafeMath for uint;
 
-    address public planManager;
+    IPlanManager public planManager;
 
     // keep track of monthly payments and start/end of those
-    mapping (address => Balance) balances;
+    mapping (address => Balance) public balances;
 
     // With lastTime and secondPrice we can determine balance by second.
     // Second price is in ETH so we must convert.
@@ -41,9 +43,11 @@ contract BalanceManager is Ownable {
      **/
     function initialize(address _planManager)
       external
+      override
     {
-        require(planManager == address(0), "Contract already initialized.");
-        planManager = _planManager;
+        Ownable.initialize();
+        require(address(planManager) == address(0), "Contract already initialized.");
+        planManager = IPlanManager(_planManager);
     }
 
     /**
@@ -52,12 +56,15 @@ contract BalanceManager is Ownable {
     function deposit() 
     external
     payable
+    override
     update(msg.sender)
     {
         require(msg.value > 0, "No Ether was deposited.");
 
         balances[msg.sender].lastBalance = balances[msg.sender].lastBalance.add(msg.value);
         balances[msg.sender].lastTime = block.timestamp;
+        notifyBalanceChange(msg.sender);
+        emit Deposit(msg.sender, msg.value);
     }
 
     /**
@@ -66,16 +73,20 @@ contract BalanceManager is Ownable {
      **/
     function withdraw(uint256 _amount)
     external
+    override
     update(msg.sender)
     {
         Balance memory balance = balances[msg.sender];
-
-        require(_amount <= balance.lastBalance, "Not enough balance for withdrawal.");
+        // this can be achieved by safeMath.sub
+        // require(_amount <= balance.lastBalance, "Not enough balance for withdrawal.");
 
         balance.lastBalance = balance.lastBalance.sub(_amount);
         balances[msg.sender] = balance;
-
+        
+        notifyBalanceChange(msg.sender);
+        // think we can just use call.value()()
         msg.sender.transfer(_amount);
+        emit Withdraw(msg.sender, _amount);
     }
 
     /**
@@ -85,6 +96,7 @@ contract BalanceManager is Ownable {
     function balanceOf(address _user)
     public
     view
+    override
     returns (uint256)
     {
         Balance memory balance = balances[_user];
@@ -109,6 +121,7 @@ contract BalanceManager is Ownable {
         **/
     function updateBalance(address _user)
     public
+    override
     {
         Balance memory balance = balances[_user];
 
@@ -119,11 +132,22 @@ contract BalanceManager is Ownable {
         uint256 loss = balance.lastBalance.sub(newBalance);
 
         // Kind of a weird way to do it, but we're giving owner the balance.
-        balances[_user].lastBalance += loss;
+        // CHANGED : _user -> owner 
+        // should check if it's ok
+        // I think it should go to nft stakers or something like balance pool
+        balances[owner()].lastBalance += loss;
 
         // Update storage balance.
         balance.lastBalance = newBalance;
         balance.lastTime = block.timestamp;
+        emit Loss(_user, loss);
+        if(newBalance == 0) {
+            // do something when expired
+            // maybe we should set price to zero
+            // also some expiration of the plan?
+            balance.perSecondPrice = 0;
+            emit PriceChange(_user, 0);
+        }
         balances[_user] = balance;
     }
 
@@ -134,9 +158,17 @@ contract BalanceManager is Ownable {
      **/
     function changePrice(address _user, uint256 _newPrice)
     external
+    override
+    update(_user)
     {
         require(msg.sender == address(planManager), "Caller is not PlanManager.");
         balances[_user].perSecondPrice = _newPrice;
+        emit PriceChange(_user, _newPrice);
     }
 
+    function notifyBalanceChange(address _user) 
+    internal
+    {
+        planManager.updateExpireTime(_user, balances[_user].lastBalance, balances[_user].perSecondPrice); 
+    }
 }

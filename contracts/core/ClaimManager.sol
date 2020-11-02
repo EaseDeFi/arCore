@@ -25,6 +25,10 @@ contract ClaimManager is Ownable {
 
     // Emitted when a user successfully receives a payout.
     event ClaimPayout(bytes32 indexed hackId, address indexed user, uint256 amount);
+
+    // for receiving redeemed ether
+    receive() external payable {
+    }
     
     /**
      * @dev Start the contract off by giving it the address of Nexus Mutual to submit a claim.
@@ -34,6 +38,7 @@ contract ClaimManager is Ownable {
     function initialize(address _planManager, address _arNFT)
       public
     {
+        Ownable.initialize();
         require(planManager == IPlanManager( address(0) ), "Contract already initialized.");
         planManager = IPlanManager(_planManager);
         arNFT = IarNFT(_arNFT);
@@ -46,23 +51,18 @@ contract ClaimManager is Ownable {
      * @param _hackTime The given timestamp for when the hack occurred.
      * @notice Make sure this cannot be done twice. I also think this protocol interaction can be simplified.
     **/
-    function redeemClaim(address _protocol, uint256 _hackTime)
+    function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount, bytes32[] calldata _path)
       external
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         
         // Gets the coverage amount of the user at the time the hack happened.
-        uint256 coverage = planManager.checkCoverage(msg.sender, _protocol, _hackTime);
-        
-        require(coverage > 0, "User had no coverage at the time of this hack.");
-    
+        require(planManager.checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path), "User does not have valid amount, check path and amount");
         // Put Ether into 18 decimal format.
-        uint256 payment = coverage * 10 ** 18;
-
+        uint256 payment = _amount * 10 ** 18;
         msg.sender.transfer(payment);
-
-        emit ClaimPayout(hackId, msg.sender, coverage);
+        emit ClaimPayout(hackId, msg.sender, _amount);
     }
     
     /**
@@ -116,8 +116,6 @@ contract ClaimManager is Ownable {
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         confirmedHacks[hackId] = true;
-        
         emit ConfirmedHack(hackId, _protocol, _hackTime);
     }
-    
 }

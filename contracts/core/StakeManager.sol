@@ -57,6 +57,7 @@ contract StakeManager is Ownable {
     function initialize(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
       public
     {
+        Ownable.initialize();
         require(arNFT == IarNFT( address(0) ), "Contract already initialized.");
         arNFT = IarNFT(_nftContract);
         rewardManager = IRewardManager(_rewardManager);
@@ -213,11 +214,8 @@ contract StakeManager is Ownable {
       view
     {
         require(_validUntil > now + 86400, "NFT is expired or within 1 day of expiry.");
-        
         require(_claimId == 0, "arNFT claim is already in progress.");
-        
         require(allowedProtocols[_scAddress], "Protocol is not allowed to be staked.");
-        
         require(_coverCurrency == ETH_SIG, "Only Ether arNFTs may be staked.");
     }
     
@@ -229,7 +227,7 @@ contract StakeManager is Ownable {
       internal
       view
     {
-        require(_validUntil > now, "NFT is not expired.");
+        require(_validUntil < now, "NFT is not expired.");
     }
     
     /**
