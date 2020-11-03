@@ -17,6 +17,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@openzeppelin/contracts": "^3.2.0",
     "@openzeppelin/test-helpers": "0.5.6",
     "bignumber.js": "9.0.1",
     "ethereumjs-util": "7.0.5",
