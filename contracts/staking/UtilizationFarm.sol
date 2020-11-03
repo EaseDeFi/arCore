@@ -8,7 +8,7 @@ import '../interfaces/IERC20.sol';
 import '../interfaces/IRewardDistributionRecipient.sol';
 
 /**
- * @dev RewardManager is nearly the exact same contract as Utilization Farm.
+ * @dev UtilizationFarm is nearly the exact same contract as RewardManager.
  *      Only difference is the initialize function instead of constructor.
 **/
 
@@ -36,7 +36,7 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
+contract UtilizationFarm is BalanceWrapper, IRewardDistributionRecipient {
     using SafeERC20 for IERC20;
 
     IERC20 public rewardToken;
