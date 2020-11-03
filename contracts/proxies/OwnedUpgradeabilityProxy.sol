@@ -1,4 +1,4 @@
-pragma solidity 0.5.7;
+pragma solidity 0.6.12;
 
 import "./UpgradeabilityProxy.sol";
 
@@ -35,7 +35,7 @@ contract OwnedUpgradeabilityProxy is UpgradeabilityProxy {
 
     /**
     * @dev Tells the address of the owner
-    * @return the address of the owner
+    * @return owner the address of the owner
     */
     function proxyOwner() public view returns (address owner) {
         bytes32 position = PROXY_OWNER_POSITION;
