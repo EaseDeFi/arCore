@@ -1,16 +1,10 @@
 pragma solidity ^0.6.6;
 
-import '../general/SafeERC20.sol';
-import '../general/BalanceWrapper.sol';
+import '../general/TokenWrapper.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IRewardDistributionRecipient.sol';
-
-/**
- * @dev RewardManager is nearly the exact same contract as Utilization Farm.
- *      Only difference is the initialize function instead of constructor.
-**/
 
 /**
 * MIT License
@@ -36,11 +30,8 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
-    using SafeERC20 for IERC20;
-
+contract LPFarm is TokenWrapper, IRewardDistributionRecipient {
     IERC20 public rewardToken;
-    address public stakeController;
     uint256 public constant DURATION = 7 days;
 
     uint256 public periodFinish = 0;
@@ -51,8 +42,8 @@ contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
     mapping(address => uint256) public rewards;
 
     event RewardAdded(uint256 reward);
-    event BalanceAdded(address indexed user, uint256 amount);
-    event BalanceWithdrawn(address indexed user, uint256 amount);
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
 
     modifier updateReward(address account) {
@@ -65,11 +56,10 @@ contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
         _;
     }
 
-    function initialize(address _rewardToken, address _stakeController)
+    constructor(address _stakeToken, address _rewardToken)
       public
     {
-        require(_rewardToken == address(0), "Contract is already initialized.");
-        stakeController = _stakeController;
+        stakeToken = IERC20(_stakeToken);
         rewardToken = IERC20(_rewardToken);
     }
 
@@ -100,20 +90,20 @@ contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address user, uint256 amount) public override updateReward(msg.sender) {
-        require(msg.sender == stakeController, "Caller is not the stake controller.");
-        super.stake(user, amount);
-        emit BalanceAdded(user, amount);
+    function stake(uint256 amount) public override updateReward(msg.sender) {
+        require(amount > 0, "Cannot stake 0");
+        super.stake(amount);
+        emit Staked(msg.sender, amount);
     }
 
-    function withdraw(address user, uint256 amount) public override updateReward(msg.sender) {
-        require(msg.sender == stakeController, "Caller is not the stake controller.");
-        super.withdraw(user, amount);
-        emit BalanceWithdrawn(user, amount);
+    function withdraw(uint256 amount) public override updateReward(msg.sender) {
+        require(amount > 0, "Cannot withdraw 0");
+        super.withdraw(amount);
+        emit Withdrawn(msg.sender, amount);
     }
 
     function exit() external {
-        withdraw(msg.sender, balanceOf(msg.sender));
+        withdraw(balanceOf(msg.sender));
         getReward();
     }
 

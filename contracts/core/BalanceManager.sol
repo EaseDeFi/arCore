@@ -1,11 +1,11 @@
 pragma solidity ^0.6.6;
 
-import '../general/SafeMath.sol';
 import '../general/Ownable.sol';
+import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
-import 'hardhat/console.sol';
+//import 'hardhat/console.sol';
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -45,7 +45,6 @@ contract BalanceManager is Ownable, IBalanceManager{
       external
       override
     {
-        Ownable.initialize();
         require(address(planManager) == address(0), "Contract already initialized.");
         planManager = IPlanManager(_planManager);
     }

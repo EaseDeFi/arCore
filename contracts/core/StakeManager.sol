@@ -1,12 +1,12 @@
 pragma solidity ^0.6.6;
 
-import '../general/SafeMath.sol';
+import '../general/Ownable.sol';
+import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IPlanManager.sol';
-import '../general/Ownable.sol';
 
 /**
  * @dev Encompasses all functions taken by stakers.
@@ -57,18 +57,11 @@ contract StakeManager is Ownable {
     function initialize(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
       public
     {
-        Ownable.initialize();
         require(arNFT == IarNFT( address(0) ), "Contract already initialized.");
         arNFT = IarNFT(_nftContract);
         rewardManager = IRewardManager(_rewardManager);
         planManager = IPlanManager(_planManager);
         claimManager = _claimManager;
-    }
-    
-    modifier updateStake(address _user)
-    {
-        rewardManager.updateStake(_user);
-        _;
     }
     
     /**
@@ -78,7 +71,6 @@ contract StakeManager is Ownable {
     **/
     function stakeNft(uint256 _nftId)
       public
-      updateStake(msg.sender)
     {
         _stake(_nftId, msg.sender);
     }
@@ -89,7 +81,6 @@ contract StakeManager is Ownable {
     **/
     function batchStakeNft(uint256[] memory _nftIds)
       public
-      updateStake(msg.sender)
     {
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
@@ -183,7 +174,7 @@ contract StakeManager is Ownable {
         /**
          * @notice This needs to point to user cover on RewardManager.
         **/
-        rewardManager.addStakes(_user, _coverPrice);
+        rewardManager.stake(_user, _coverPrice);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
     }
     
@@ -198,7 +189,7 @@ contract StakeManager is Ownable {
         /**
          * @notice This needs to point to user cover on RewardManager.
         **/
-        rewardManager.subStakes(_user, _coverPrice);
+        rewardManager.withdraw(_user, _coverPrice);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     

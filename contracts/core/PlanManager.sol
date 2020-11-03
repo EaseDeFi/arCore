@@ -1,9 +1,11 @@
 pragma solidity ^0.6.6;
+
+import '../libraries/MerkleProof.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
-import '../general/MerkleProof.sol';
 import '../interfaces/IPlanManager.sol';
-import 'hardhat/console.sol';
+//import 'hardhat/console.sol';
+
 /**
  * @dev Separating this off to specifically keep track of a borrower's plans.
 **/

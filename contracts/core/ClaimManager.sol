@@ -38,7 +38,6 @@ contract ClaimManager is Ownable {
     function initialize(address _planManager, address _arNFT)
       public
     {
-        Ownable.initialize();
         require(planManager == IPlanManager( address(0) ), "Contract already initialized.");
         planManager = IPlanManager(_planManager);
         arNFT = IarNFT(_arNFT);
