@@ -68,8 +68,7 @@ contract ClaimManager is Ownable {
      * @dev Submit any NFT that was active at the time of a hack on its protocol.
      * @param _nftId ID of the NFT to submit.
      * @param _protocol Address of the protocol the hack occurred on.
-     * @param _hackTime The timestamp of the hack that occurred.
-     * @notice I think this _protocol/_protocolAddress use can be simplified.
+     * @param _hackTime The timestamp of the hack that occurred. Hacktime is the START of the hack if not a single tx.
     **/
     function submitNft(uint256 _nftId, address _protocol, uint256 _hackTime)
       external
@@ -77,7 +76,7 @@ contract ClaimManager is Ownable {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
 
-        (/*cid*/, uint8 status, /*sumAssured*/, /*coverPeriod*/, uint256 validUntil, address scAddress,
+        (/*cid*/, uint8 status, /*sumAssured*/, uint16 coverPeriod, uint256 validUntil, address scAddress,
          /*currencyCode*/, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
 
         // Call arNFT to ensure token had not been claimed
@@ -86,6 +85,10 @@ contract ClaimManager is Ownable {
         
         // Make sure arNFT was active at the time
         require(validUntil >= _hackTime, "arNFT was not valid at time of hack.");
+        
+        // Make sure NFT was purchased before hack.
+        uint256 generationTime = validUntil - (uint256(coverPeriod) * 1 days);
+        require(generationTime <= _hackTime, "arNFT had not been purchased before hack.");
 
         // Make sure arNFT protocol matches
         require(scAddress == _protocol, "arNFT does not cover correct protocol.");
