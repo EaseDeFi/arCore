@@ -34,7 +34,6 @@ describe("BalanceManager", function () {
     });
 
     it("should emit Deposit Event", async function (){
-      // don't know how to make this work :(
       await expect(balanceManager.connect(user).deposit({value:amount})).to.emit(balanceManager, 'Deposit').withArgs((await user.getAddress()), amount.toString());
     });
   });
