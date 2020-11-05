@@ -61,6 +61,10 @@ describe("BalanceManager", function () {
       await balanceManager.connect(user).withdraw(amount);
       const balanceAfter = (await balanceManager.balances(user.getAddress())).lastBalance;
     });
+
+    it("should emit Withdraw event", async function (){
+      await expect(balanceManager.connect(user).withdraw(amount)).to.emit(balanceManager, 'Withdraw').withArgs((await user.getAddress()), amount.toString());
+    });
   });
 
   describe("#changePrice()", function () {
