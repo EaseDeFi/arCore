@@ -45,7 +45,8 @@ contract TimelockOwned is Ownable {
     function executeProposal(address _target, bytes memory _data)
       internal
     {
-        _target.call{value: 0}(_data);
+        (bool success, bytes ret) = _target.call{value: 0}(_data);
+        require(success, "Failed to execute proposal");
     }
     
 }
