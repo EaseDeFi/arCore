@@ -542,7 +542,7 @@ contract arNFTMock is
     // cannot go back to false
     bool public swapActivated;
 
-    // mock data
+    // ock data
     uint256 coverId__;
     uint256 claimId__;
 
@@ -806,7 +806,7 @@ contract arNFTMock is
         status_[coverId__] = 0;
         sumAssured_[coverId__] = _coverDetails[0];
         coverPeriod_[coverId__] = _coverPeriod;
-        validUntil_[coverId__] = now + _coverPeriod;
+        validUntil_[coverId__] = now + _coverPeriod * 1 days;
         scAddress_[coverId__] = _coveredContractAddress;
         currencyCode_[coverId__] = _coverCurrency;
         premiumNXM_[coverId__] = _coverDetails[2];

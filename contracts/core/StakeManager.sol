@@ -7,6 +7,7 @@ import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IPlanManager.sol';
+import '../interfaces/IClaimManager.sol';
 
 /**
  * @dev Encompasses all functions taken by stakers.
@@ -23,13 +24,12 @@ contract StakeManager is Ownable {
 
     // external contract addresses
     IarNFT public arNFT;
-    IERC20 public daiContract;
 
     // internal contract addresses 
     IRewardManager public rewardManager;
     IPlanManager public planManager;
     // All NFTs will be immediately sent to the claim manager.
-    address public claimManager;
+    IClaimManager public claimManager;
     
     // Protocols that staking is allowed for. We may not allow all NFTs.
     mapping (address => bool) public allowedProtocols;
@@ -57,11 +57,11 @@ contract StakeManager is Ownable {
     function initialize(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
       public
     {
-        require(arNFT == IarNFT( address(0) ), "Contract already initialized.");
+        require(address(arNFT) == address(0), "Contract already initialized.");
         arNFT = IarNFT(_nftContract);
         rewardManager = IRewardManager(_rewardManager);
         planManager = IPlanManager(_planManager);
-        claimManager = _claimManager;
+        claimManager = IClaimManager(_claimManager);
     }
     
     /**
@@ -138,10 +138,10 @@ contract StakeManager is Ownable {
     function _stake(uint256 _nftId, address _user)
       internal
     {
-        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress, 
-         bytes4 coverCurrency, /*premiumNXM*/, uint256 coverPrice, uint256 claimId) = arNFT.getToken(_nftId);
+        (/*coverId*/,  uint8 coverStatus, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress, 
+         bytes4 coverCurrency, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = arNFT.getToken(_nftId);
         
-        _checkNftValid(validUntil, scAddress, coverCurrency, claimId);
+        _checkNftValid(validUntil, scAddress, coverCurrency, coverStatus);
         
         // coverPrice must be determined by dividing by length.
         uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
@@ -152,7 +152,7 @@ contract StakeManager is Ownable {
         
         planManager.changePrice(scAddress, pricePerAmount);
         
-        arNFT.transferFrom(_user, claimManager, _nftId);
+        arNFT.transferFrom(_user, address(claimManager), _nftId);
 
         // Save owner of NFT.
         nftOwners[_nftId] = _user;
@@ -198,14 +198,15 @@ contract StakeManager is Ownable {
      * @param _validUntil The expiration time of this NFT.
      * @param _scAddress The smart contract protocol that the NFt is protecting.
      * @param _coverCurrency The currency that this NFT is protected in (must be ETH_SIG).
-     * @param _claimId ID of the claim (if any) that this NFT is going through.
+     * @param _coverStatus status of cover, only accepts Active
     **/
-    function _checkNftValid(uint256 _validUntil, address _scAddress, bytes4 _coverCurrency, uint256 _claimId)
+    function _checkNftValid(uint256 _validUntil, address _scAddress, bytes4 _coverCurrency, uint8 _coverStatus)
       internal
       view
     {
         require(_validUntil > now + 86400, "NFT is expired or within 1 day of expiry.");
-        require(_claimId == 0, "arNFT claim is already in progress.");
+        // should change this to check status not claimId
+        require(_coverStatus == 0, "arNFT claim is already in progress.");
         require(allowedProtocols[_scAddress], "Protocol is not allowed to be staked.");
         require(_coverCurrency == ETH_SIG, "Only Ether arNFTs may be staked.");
     }
@@ -218,6 +219,7 @@ contract StakeManager is Ownable {
       internal
       view
     {
+        //should add 35 days in here?
         require(_validUntil < now, "NFT is not expired.");
     }
     
