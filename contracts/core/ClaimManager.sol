@@ -22,7 +22,6 @@ contract ClaimManager is Ownable {
     
     // Emitted when a new hack has been recorded.
     event ConfirmedHack(bytes32 indexed hackId, address indexed protocol, uint256 timestamp);
-
     // Emitted when a user successfully receives a payout.
     event ClaimPayout(bytes32 indexed hackId, address indexed user, uint256 amount);
 

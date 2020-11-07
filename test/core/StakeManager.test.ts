@@ -93,5 +93,15 @@ describe("StakeManager", function () {
       await arNFT.connect(user).approve(stakeManager.address, 0);
       await stakeManager.connect(user).stakeNft(0);
     });
+
+    it("should fail if nft is not expired", async function(){
+      await arNFT.mockSetCoverStatus(0, 1);
+      await expect(stakeManager.connect(user).removeExpiredNft(0)).to.be.reverted;
+    });
+    
+    it("should success if nft is expired", async function(){
+      await arNFT.mockSetCoverStatus(0, 3);
+      await stakeManager.connect(user).removeExpiredNft(0);
+    });
   });
 });

@@ -73,7 +73,7 @@ describe("BalanceManager", function () {
       await expect(balanceManager.connect(user).changePrice(await user.getAddress(),newPrice)).to.be.reverted;
     });
     it("should update perSecondPrice when updated", async function(){
-      await planManager.changePrice(balanceManager.address, await user.getAddress(),newPrice);
+      await planManager.mockChangePrice(balanceManager.address, await user.getAddress(),newPrice);
       const price = (await balanceManager.balances(user.getAddress())).perSecondPrice;
       expect(price.toString()).to.equal(newPrice.toString());
     });

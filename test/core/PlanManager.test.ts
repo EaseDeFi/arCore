@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
-import { OrderedMerkleTree } from "./utils/Merkle";
+import { OrderedMerkleTree } from "../utils/Merkle";
 function encodeProtocol(protocol: string, amount: BigNumber) {
   const abiCoder = new ethers.utils.AbiCoder();
   return ethers.utils.keccak256(abiCoder.encode(["address", "uint256"],[protocol, amount]));

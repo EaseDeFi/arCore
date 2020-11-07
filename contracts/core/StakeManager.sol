@@ -95,10 +95,10 @@ contract StakeManager is Ownable {
     function removeExpiredNft(uint256 _nftId)
       public
     {
-        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress, 
+        (/*coverId*/, uint8 status, uint256 sumAssured, uint16 coverPeriod, /*valid until*/, address scAddress, 
          /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = arNFT.getToken(_nftId);
         
-        _checkNftExpired(validUntil);
+        _checkNftExpired(status);
         
         address user = nftOwners[_nftId];
         require(user != address(0), "NFT does not belong here.");
@@ -213,14 +213,14 @@ contract StakeManager is Ownable {
     
     /**
      * @dev Check if an NFT is owned on here and has expired.
-     * @param _validUntil Unix time that the NFT expires.
+     * @param _coverStatus Unix time that the NFT expires.
     **/
-    function _checkNftExpired(uint256 _validUntil)
+    function _checkNftExpired(uint8 _coverStatus)
       internal
-      view
+      pure
     {
-        //should add 35 days in here?
-        require(_validUntil < now, "NFT is not expired.");
+        // changed to get status instead of validUntil
+        require(_coverStatus == 3, "NFT is not expired.");
     }
     
     /**
@@ -234,5 +234,4 @@ contract StakeManager is Ownable {
     {
         allowedProtocols[_protocol] = _allow;    
     }
-    
 }
