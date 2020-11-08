@@ -1,5 +1,6 @@
 pragma solidity ^0.6.6;
 
+import '../general/Ownable.sol';
 import '../general/SafeERC20.sol';
 import '../general/BalanceWrapper.sol';
 import '../libraries/Math.sol';
@@ -36,11 +37,12 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract UtilizationFarm is BalanceWrapper, IRewardDistributionRecipient {
+contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipient {
     using SafeERC20 for IERC20;
 
     IERC20 public rewardToken;
     address public stakeController;
+    address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
 
     uint256 public periodFinish = 0;
@@ -65,12 +67,25 @@ contract UtilizationFarm is BalanceWrapper, IRewardDistributionRecipient {
         _;
     }
 
+    modifier onlyRewardDistribution() {
+        require(msg.sender == rewardDistribution, "Caller is not reward distribution");
+        _;
+    }
+
     function initialize(address _rewardToken, address _stakeController)
       public
     {
         require(_rewardToken == address(0), "Contract is already initialized.");
         stakeController = _stakeController;
         rewardToken = IERC20(_rewardToken);
+    }
+
+    function setRewardDistribution(address _rewardDistribution)
+        external
+        override
+        onlyOwner
+    {
+        rewardDistribution = _rewardDistribution;
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {

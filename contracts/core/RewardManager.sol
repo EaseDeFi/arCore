@@ -1,5 +1,6 @@
 pragma solidity ^0.6.6;
 
+import '../general/Ownable.sol';
 import '../general/SafeERC20.sol';
 import '../general/BalanceWrapper.sol';
 import '../libraries/Math.sol';
@@ -37,11 +38,12 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract RewardManager is BalanceWrapper, IRewardDistributionRecipient, IRewardManager{
+contract RewardManager is BalanceWrapper, Ownable, IRewardDistributionRecipient, IRewardManager{
     using SafeERC20 for IERC20;
 
     IERC20 public rewardToken;
     address public stakeController;
+    address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
 
     uint256 public periodFinish = 0;
@@ -66,13 +68,28 @@ contract RewardManager is BalanceWrapper, IRewardDistributionRecipient, IRewardM
         _;
     }
 
-    function initialize(address _rewardToken, address _stakeController)
+    modifier onlyRewardDistribution() {
+        require(msg.sender == rewardDistribution, "Caller is not reward distribution");
+        _;
+    }
+
+    function initialize(address _rewardToken, address _stakeController, address _rewardDistribution)
       external
       override
     {
-        require(_rewardToken == address(0), "Contract is already initialized.");
+        Ownable.initialize();
+        require(address(rewardToken) == address(0), "Contract is already initialized.");
         stakeController = _stakeController;
         rewardToken = IERC20(_rewardToken);
+        rewardDistribution = _rewardDistribution;
+    }
+    
+    function setRewardDistribution(address _rewardDistribution)
+        external
+        override
+        onlyOwner
+    {
+        rewardDistribution = _rewardDistribution;
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
@@ -134,6 +151,8 @@ contract RewardManager is BalanceWrapper, IRewardDistributionRecipient, IRewardM
         onlyRewardDistribution
         updateReward(address(0))
     {
+        //this will make sure tokens are in the reward pool
+        rewardToken.safeTransferFrom(msg.sender, address(this), reward);
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(DURATION);
         } else {

@@ -57,6 +57,7 @@ contract StakeManager is Ownable {
     function initialize(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
       public
     {
+        Ownable.initialize();
         require(address(arNFT) == address(0), "Contract already initialized.");
         arNFT = IarNFT(_nftContract);
         rewardManager = IRewardManager(_rewardManager);

@@ -45,6 +45,7 @@ contract BalanceManager is Ownable, IBalanceManager{
       external
       override
     {
+        Ownable.initialize();
         require(address(planManager) == address(0), "Contract already initialized.");
         planManager = IPlanManager(_planManager);
     }
