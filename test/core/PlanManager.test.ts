@@ -13,19 +13,22 @@ describe("PlanManager", function () {
   //mock
   let balanceManager: Contract;
   let stakeManager: Contract;
+  let claimManager: Contract;
   //accounts settings
   let user: Signer;
   beforeEach(async function () {
     const BalanceFactory = await ethers.getContractFactory("BalanceManagerMock");
     const StakeFactory = await ethers.getContractFactory("StakeManagerMock");
+    const ClaimFactory = await ethers.getContractFactory("ClaimManagerMock");
     const PlanFactory = await ethers.getContractFactory("PlanManager");
 
     //mock contracts
     balanceManager = await BalanceFactory.deploy();
     stakeManager = await StakeFactory.deploy();
+    claimManager = await ClaimFactory.deploy();
 
     planManager = await PlanFactory.deploy();
-    await planManager.initialize(stakeManager.address, balanceManager.address);
+    await planManager.initialize(stakeManager.address, balanceManager.address, claimManager.address);
     //mock setting
     await stakeManager.mockSetPlanManager(planManager.address);
 
@@ -87,7 +90,7 @@ describe("PlanManager", function () {
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       const merkle = new OrderedMerkleTree([plan.root]);
       const path = merkle.getPath(0);
-      expect(await planManager.checkCoverage(await user.getAddress(), balanceManager.address, plan.end.sub(price), coverAmount, path)).to.equal(true);
+      expect((await planManager.checkCoverage(await user.getAddress(), balanceManager.address, plan.end.sub(price), coverAmount, path)).check).to.equal(true);
     });
 
     it("should be able to update when there is currenct plan", async function(){

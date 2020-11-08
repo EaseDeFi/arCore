@@ -10,7 +10,6 @@ describe("StakeManager", function () {
   let stakeManager: Contract;
 
   let arNFT: Contract;
-  let dai: Contract;
 
   let user: Signer;
   let owner: Signer;

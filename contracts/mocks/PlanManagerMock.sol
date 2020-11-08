@@ -22,7 +22,7 @@ contract PlanManagerMock {
   function mockCoverage(bool _coverage) external {
     coverage = _coverage;
   }
-  function checkCoverage(address _user, address _sc, uint256 _time, uint256 _amount, bytes32[] calldata _path) external view returns(bool){
-    return coverage;
+  function checkCoverage(address _user, address _sc, uint256 _time, uint256 _amount, bytes32[] calldata _path) external view returns(uint256 index, bool check){
+    return (0, coverage);
   }
 }
