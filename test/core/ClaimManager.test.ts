@@ -46,7 +46,7 @@ describe("ClaimManager", function () {
     }); 
   });
 
-  describe.only('#submitNft()', function(){
+  describe('#submitNft()', function(){
     let now;
     beforeEach(async function(){
       await stakeManager.connect(owner).allowProtocol(arNFT.address, true);
@@ -67,10 +67,10 @@ describe("ClaimManager", function () {
     });
 
     it('should fail if hack is not confirmed yet', async function(){
-      await expect(claimManager.connect(user).submitNft(0, arNFT.address, now.subn(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
+      await expect(claimManager.connect(user).submitNft(0, now.subn(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
     });
     it('should success', async function(){
-      await claimManager.connect(user).submitNft(0, arNFT.address, now.subn(1).toString());
+      await claimManager.connect(user).submitNft(0, now.subn(1).toString());
     });
   });
 

@@ -55,6 +55,7 @@ contract ClaimManager is Ownable {
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         
         // Gets the coverage amount of the user at the time the hack happened.
+        // TODO check if plan is not active now => to prevent users paying more than needed
         (uint256 planIndex, bool covered) = planManager.checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path);
         require(covered, "User does not have valid amount, check path and amount");
         // Put Ether into 18 decimal format.
@@ -67,22 +68,23 @@ contract ClaimManager is Ownable {
     /**
      * @dev Submit any NFT that was active at the time of a hack on its protocol.
      * @param _nftId ID of the NFT to submit.
-     * @param _protocol Address of the protocol the hack occurred on.
      * @param _hackTime The timestamp of the hack that occurred. Hacktime is the START of the hack if not a single tx.
     **/
-    function submitNft(uint256 _nftId, address _protocol, uint256 _hackTime)
+    function submitNft(uint256 _nftId,uint256 _hackTime)
       external
     {
-        bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
-        require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
 
-        (/*cid*/, uint8 status, /*sumAssured*/, uint16 coverPeriod, uint256 validUntil, address scAddress,
+        (/*cid*/, /*status*/, /*sumAssured*/, uint16 coverPeriod, uint256 validUntil, address scAddress,
          bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
-
+        bytes32 hackId = keccak256(abi.encodePacked(scAddress, _hackTime));
+        
+        require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         require(currencyCode == ETH_SIG, "Only ETH nft can be submitted");
         // Call arNFT to ensure token had not been claimed
         // Status must be Active, ClaimDenied, or CoverExpired.
-        require(status == 0 || status == 2 || status == 3);
+        // TODO: check if it is ok to submit expired cover
+        // Seems this can be handled by nxm
+        //require(status == 0 || status == 2 || status == 3);
         
         // Make sure arNFT was active at the time
         require(validUntil >= _hackTime, "arNFT was not valid at time of hack.");
@@ -90,9 +92,6 @@ contract ClaimManager is Ownable {
         // Make sure NFT was purchased before hack.
         uint256 generationTime = validUntil - (uint256(coverPeriod) * 1 days);
         require(generationTime <= _hackTime, "arNFT had not been purchased before hack.");
-
-        // Make sure arNFT protocol matches
-        require(scAddress == _protocol, "arNFT does not cover correct protocol.");
 
         arNFT.submitClaim(_nftId);
     }

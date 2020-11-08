@@ -5,6 +5,7 @@ import '../general/BalanceWrapper.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
+import '../interfaces/IRewardManager.sol';
 import '../interfaces/IRewardDistributionRecipient.sol';
 
 /**
@@ -36,7 +37,7 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
+contract RewardManager is BalanceWrapper, IRewardDistributionRecipient, IRewardManager{
     using SafeERC20 for IERC20;
 
     IERC20 public rewardToken;
@@ -66,7 +67,8 @@ contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
     }
 
     function initialize(address _rewardToken, address _stakeController)
-      public
+      external
+      override
     {
         require(_rewardToken == address(0), "Contract is already initialized.");
         stakeController = _stakeController;
@@ -100,29 +102,29 @@ contract RewardManager is BalanceWrapper, IRewardDistributionRecipient {
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address user, uint256 amount) public override updateReward(msg.sender) {
+    function stake(address user, uint256 amount) external override updateReward(user) {
         require(msg.sender == stakeController, "Caller is not the stake controller.");
-        super.stake(user, amount);
+        _addStake(user, amount);
         emit BalanceAdded(user, amount);
     }
 
-    function withdraw(address user, uint256 amount) public override updateReward(msg.sender) {
+    function withdraw(address user, uint256 amount) public override updateReward(user) {
         require(msg.sender == stakeController, "Caller is not the stake controller.");
-        super.withdraw(user, amount);
+        _removeStake(user, amount);
         emit BalanceWithdrawn(user, amount);
     }
 
-    function exit() external {
-        withdraw(msg.sender, balanceOf(msg.sender));
-        getReward();
+    function exit(address user) external override {
+        withdraw(user, balanceOf(user));
+        getReward(user);
     }
 
-    function getReward() public updateReward(msg.sender) {
-        uint256 reward = earned(msg.sender);
+    function getReward(address user) public override updateReward(user) {
+        uint256 reward = earned(user);
         if (reward > 0) {
-            rewards[msg.sender] = 0;
-            rewardToken.safeTransfer(msg.sender, reward);
-            emit RewardPaid(msg.sender, reward);
+            rewards[user] = 0;
+            rewardToken.safeTransfer(user, reward);
+            emit RewardPaid(user, reward);
         }
     }
 

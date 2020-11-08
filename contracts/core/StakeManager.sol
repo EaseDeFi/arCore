@@ -103,9 +103,6 @@ contract StakeManager is Ownable {
         address user = nftOwners[_nftId];
         require(user != address(0), "NFT does not belong here.");
         
-        // determine cover price, convert to dai if needed
-        rewardManager.updateStake(user);
-        
         uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
         
         _subtractCovers(user, sumAssured, secondPrice, scAddress);
