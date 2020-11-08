@@ -18,7 +18,7 @@ contract InitializeManager {
     {
         IBalanceManager(_balanceManager).initialize(_planManager);
         IClaimManager(_claimManager).initialize(_planManager, _arNFT);
-        IPlanManager(_planManager).initialize(_stakeManager, _balanceManager);
+        IPlanManager(_planManager).initialize(_stakeManager, _balanceManager, _claimManager);
         IRewardManager(_rewardManager).initialize(_armorToken, _stakeManager);
         IStakeManager(_stakeManager).initialize(_arNFT, _rewardManager, _planManager, _claimManager);
     }

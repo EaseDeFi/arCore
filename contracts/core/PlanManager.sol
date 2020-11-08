@@ -4,7 +4,7 @@ import '../libraries/MerkleProof.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
-//import 'hardhat/console.sol';
+import '../interfaces/IClaimManager.sol';
 
 /**
  * @dev Separating this off to specifically keep track of a borrower's plans.
@@ -32,18 +32,22 @@ contract PlanManager is IPlanManager {
         uint128 startTime;
         uint128 endTime;
         bytes32 merkleRoot;
+        mapping(address => bool) claimed;
     }
 
     IStakeManager public stakeManager;
     IBalanceManager public balanceManager;
+    IClaimManager public claimManager;
     
     function initialize(
         address _stakeManager,
-        address _balanceManager
+        address _balanceManager,
+        address _claimManager
     ) external override {
         require(stakeManager == IStakeManager(address(0)), "Contract already initialized.");
         stakeManager = IStakeManager(_stakeManager);
         balanceManager = IBalanceManager(_balanceManager);
+        claimManager = IClaimManager(_claimManager);
         markup = 2;
     }
 
@@ -54,6 +58,11 @@ contract PlanManager is IPlanManager {
 
     modifier onlyBalanceManager() {
         require(msg.sender == address(balanceManager), "Only BalanceManager can call this function");
+        _;
+    }
+    
+    modifier onlyClaimManager() {
+        require(msg.sender == address(claimManager), "Only ClaimManager can call this function");
         _;
     }
 
@@ -164,30 +173,37 @@ contract PlanManager is IPlanManager {
      * @param _user The user to check coverage for.
      * @param _protocol The address of the protocol that was hacked. (Address used according to arNFT).
      * @param _hackTime The timestamp of when a hack happened.
-     * return The amount of coverage the user had at the time--0 if none.
+     * @return index index of plan for hackTime
+     * @return check 
     **/
     function checkCoverage(address _user, address _protocol, uint256 _hackTime, uint256 _amount, bytes32[] calldata _path)
       external
       view
       override
-      // Make sure we update balance if needed
-    returns (bool)
+      returns(uint256 index, bool check)
     {
         // This may be more gas efficient if we don't grab this first but instead grab each plan from storage individually?
-        Plan[] memory planArray = plans[_user];
+        Plan[] storage planArray = plans[_user];
         
         // In normal operation, this for loop should never get too big.
         // If it does (from malicious action), the user will be the only one to suffer.
         for (int256 i = int256(planArray.length - 1); i >= 0; i--) {
-            Plan memory plan = planArray[uint256(i)];
+            Plan storage plan = planArray[uint256(i)];
             // Only one plan will be active at the time of a hack--return cover amount from then.
             if (_hackTime >= plan.startTime && _hackTime < plan.endTime) {
-                return MerkleProof.verify(_path, plan.merkleRoot, keccak256(abi.encodePacked(_protocol, _amount)));
+                //typecast -- is it safe?
+                return (uint256(i), !plan.claimed[_protocol] && MerkleProof.verify(_path, plan.merkleRoot, keccak256(abi.encodePacked(_protocol, _amount))));
             }
         }
-        return false;
+        return (uint256(-1), false);
     }
-    
+
+    function planRedeemed(address _user, uint256 _planIndex, address _protocol) external override onlyClaimManager{
+        Plan storage plan = plans[_user][_planIndex];
+        require(plan.endTime < now, "Cannot redeem active plan, update to ");
+        plan.claimed[_protocol] = true;
+    }
+
     /**
      * @dev Armor has the ability to change the price that a user is paying for their insurance.
      * @param _protocol The protocol whose arNFT price is being updated.

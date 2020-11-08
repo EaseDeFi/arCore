@@ -5,7 +5,6 @@ import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
 import '../interfaces/IPlanManager.sol';
-
 /**
  * @dev This contract holds all NFTs. The only time it does something is if a user requests a claim.
  * @notice We need to make sure a user can only claim when they have balance.
@@ -56,9 +55,11 @@ contract ClaimManager is Ownable {
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         
         // Gets the coverage amount of the user at the time the hack happened.
-        require(planManager.checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path), "User does not have valid amount, check path and amount");
+        (uint256 planIndex, bool covered) = planManager.checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path);
+        require(covered, "User does not have valid amount, check path and amount");
         // Put Ether into 18 decimal format.
         uint256 payment = _amount * 10 ** 18;
+        planManager.planRedeemed(msg.sender, planIndex, _protocol);
         msg.sender.transfer(payment);
         emit ClaimPayout(hackId, msg.sender, _amount);
     }
@@ -76,8 +77,9 @@ contract ClaimManager is Ownable {
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
 
         (/*cid*/, uint8 status, /*sumAssured*/, uint16 coverPeriod, uint256 validUntil, address scAddress,
-         /*currencyCode*/, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
+         bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
 
+        require(currencyCode == ETH_SIG, "Only ETH nft can be submitted");
         // Call arNFT to ensure token had not been claimed
         // Status must be Active, ClaimDenied, or CoverExpired.
         require(status == 0 || status == 2 || status == 3);
@@ -103,6 +105,7 @@ contract ClaimManager is Ownable {
     function redeemNft(uint256 _nftId)
       external
     {
+        //TODO: decrease total covered amount
         arNFT.redeemClaim(_nftId);
     }
     
@@ -115,6 +118,7 @@ contract ClaimManager is Ownable {
       external
       onlyOwner
     {
+        require(_hackTime < now, "Cannot confirm future");
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         confirmedHacks[hackId] = true;
         emit ConfirmedHack(hackId, _protocol, _hackTime);
