@@ -16,12 +16,12 @@ contract BalanceWrapper {
         return _balances[account];
     }
 
-    function stake(address user, uint256 amount) public virtual {
+    function _addStake(address user, uint256 amount) internal {
         _totalSupply = _totalSupply.add(amount);
         _balances[user] = _balances[user].add(amount);
     }
 
-    function withdraw(address user, uint256 amount) public virtual {
+    function _removeStake(address user, uint256 amount) internal {
         _totalSupply = _totalSupply.sub(amount);
         _balances[user] = _balances[user].sub(amount);
     }
