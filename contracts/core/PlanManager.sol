@@ -222,6 +222,7 @@ contract PlanManager is IPlanManager {
       override
       onlyBalanceManager
     {
+        if (plans[_user].length == 0) return;
         Plan storage plan = plans[_user][plans[_user].length-1];
         if(plan.endTime >= now){
             plan.endTime = uint128(_balance / _pricePerSec + now);
