@@ -6,4 +6,4 @@ Armor Core allows users to buy cover for funds held on various DeFi protocols th
 This code has not been fully tested and is not audited. It is not on mainnet and will not be until testing is complete and multiple audits have been done.
 <br>
 <br>
-If you'd like to read more about Armor Core our documentation at https://app.gitbook.com/@armorfi/s/armor/products/arcore
+If you'd like to read more about Armor Core, its documentation is in the "ArCore: Smart Cover System" section of https://armorfi.gitbook.io/armor/
