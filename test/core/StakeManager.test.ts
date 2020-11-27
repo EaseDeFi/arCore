@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
+import { increase } from "../utils";
 describe("StakeManager", function () {
   let accounts: Signer[];
   let rewardManager: Contract;
@@ -48,7 +49,7 @@ describe("StakeManager", function () {
       await arNFT.connect(user).approve(stakeManager.address, 0);
     });
     it("should fail if nft is expired or 1 day before expiration", async function() {
-      await time.increase(time.duration.days(100));
+      await increase(86400 * 100);
       await expect(stakeManager.connect(user).stakeNft(0)).to.be.revertedWith("NFT is expired or within 1 day of expiry.");
     });
     it("should fail if nft submitted to claim", async function() {
