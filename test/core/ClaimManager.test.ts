@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
-import { time } from "@openzeppelin/test-helpers";
+import { getTimestamp, increase } from "../utils";
 describe("ClaimManager", function () {
   let accounts: Signer[];
   let rewardManager: Contract;
@@ -39,9 +39,9 @@ describe("ClaimManager", function () {
       await expect(claimManager.connect(user).confirmHack(planManager.address, 100)).to.be.revertedWith('msg.sender is not owner');
     }); 
     it('should fail if _hackTime is future',async function(){
-      const latest = await time.latest();
+      const latest = await getTimestamp();
       await expect(
-        claimManager.connect(owner).confirmHack(planManager.address,latest.addn(1000).toString())// latest.addn(10000))
+        claimManager.connect(owner).confirmHack(planManager.address,latest.add(1000).toString())// latest.addn(10000))
       ).to.be.revertedWith('Cannot confirm future');
     }); 
   });
@@ -61,16 +61,16 @@ describe("ClaimManager", function () {
       );
       await arNFT.connect(user).approve(stakeManager.address, 0);
       await stakeManager.connect(user).stakeNft(0);
-      await time.increase(100);
-      now = await time.latest();
-      await claimManager.connect(owner).confirmHack(arNFT.address, now.subn(1).toString());
+      await increase(100);
+      now = await getTimestamp();
+      await claimManager.connect(owner).confirmHack(arNFT.address, now.sub(1).toString());
     });
 
     it('should fail if hack is not confirmed yet', async function(){
-      await expect(claimManager.connect(user).submitNft(0, now.subn(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
+      await expect(claimManager.connect(user).submitNft(0, now.sub(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
     });
     it('should success', async function(){
-      await claimManager.connect(user).submitNft(0, now.subn(1).toString());
+      await claimManager.connect(user).submitNft(0, now.sub(1).toString());
     });
   });
 
