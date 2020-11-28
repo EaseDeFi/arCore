@@ -16,8 +16,17 @@ describe("BalanceManager", function () {
     await balanceManager.initialize(planManager.address);
   });
 
+  describe("#initialize()", function() {
+    it("should fail if already initialized", async function(){
+      await expect(balanceManager.connect(user).initialize(planManager.address)).to.be.revertedWith("Contract already initialized");
+    });
+  });
+
   describe("#deposit()", function () {
     const amount = ethers.BigNumber.from("1000000");
+    it('should fail if msg.value is zero', async function(){
+      await expect(balanceManager.connect(user).deposit()).to.be.revertedWith("No Ether was deposited");
+    });
     it("should update balance", async function(){
       await balanceManager.connect(user).deposit({value:amount});
       expect('updateBalance').to.be.calledOnContract(balanceManager);
