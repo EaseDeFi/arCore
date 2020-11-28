@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
 import { increase } from "../utils";
-describe("RewardManager", function () {
+describe.only("RewardManager", function () {
   let accounts: Signer[];
   let rewardManager: Contract;
   let stakeManager: Signer;
@@ -13,6 +13,7 @@ describe("RewardManager", function () {
   let owner: Signer;
   let rewardDistribution: Signer;
   let amount = 1000000;
+  let rewardAmount = amount * 100;
   beforeEach(async function () {
     const RewardFactory = await ethers.getContractFactory("RewardManager");
     const TokenFactory = await ethers.getContractFactory("ERC20Mock");
@@ -25,6 +26,23 @@ describe("RewardManager", function () {
     rewardDistribution = accounts[2];
     token = await TokenFactory.connect(owner).deploy();
     await rewardManager.connect(owner).initialize(token.address, await stakeManager.getAddress(), await rewardDistribution.getAddress());
+  });
+
+  describe('#initialize()', function(){
+    it('should fail if already initialized', async function(){
+      await expect(rewardManager.connect(owner).initialize(token.address, await stakeManager.getAddress(), await rewardDistribution.getAddress())).to.be.revertedWith("Contract is already initialized.");
+    });
+  });
+
+  describe('#setRewardDistribution()', function(){
+    it('should fail if msg.sender is not owner', async function(){
+      await expect(rewardManager.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("msg.sender is not owner");
+    });
+
+    it('should change reward distribution address', async function(){
+      await rewardManager.connect(owner).setRewardDistribution(await user.getAddress());
+      expect(await rewardManager.rewardDistribution()).to.be.equal(await user.getAddress());
+    });
   });
 
   describe('#notifyRewardAmount()', function(){
@@ -59,6 +77,11 @@ describe("RewardManager", function () {
   });
 
   describe('#stake()', function(){
+    beforeEach(async function(){
+      await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
+      await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
+      await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+    });
     it('should fail if msg.sender is not stake manager', async function(){
       await expect(rewardManager.connect(owner).stake(await user.getAddress(), amount)).to.be.revertedWith('Caller is not the stake controller');
     });
@@ -77,7 +100,11 @@ describe("RewardManager", function () {
   
   describe('#withdraw()', function(){
     beforeEach(async function(){
+      await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
+      await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
       await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
+      await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+      await increase(100);
     });
 
     it('should fail if msg.sender is not stake manager', async function(){
@@ -93,6 +120,63 @@ describe("RewardManager", function () {
       const address = await user.getAddress();
       await rewardManager.connect(stakeManager).withdraw(address, amount);
       expect(await rewardManager.balanceOf(address)).to.be.equal(0);
+    });
+
+    it('should not decrease reward amount', async function(){
+      const address = await user.getAddress();
+      await rewardManager.connect(stakeManager).withdraw(address, amount);
+      expect(await rewardManager.rewards(address)).to.not.equal(0);
+    });
+  });
+  
+  describe('#exit()', function(){
+    beforeEach(async function(){
+      await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
+      await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
+      await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
+      await increase(100);
+    });
+
+    it('should fail if msg.sender is not stake manager', async function(){
+      await expect(rewardManager.connect(owner).exit(await user.getAddress())).to.be.revertedWith('Caller is not the stake controller');
+    });
+
+    it('should decrease total supply', async function(){
+      await rewardManager.connect(stakeManager).exit(await user.getAddress());
+      expect(await rewardManager.totalSupply()).to.be.equal(0);
+    });
+
+    it('should decrease balanceOf user', async function(){
+      const address = await user.getAddress();
+      await rewardManager.connect(stakeManager).exit(address);
+      expect(await rewardManager.balanceOf(address)).to.be.equal(0);
+    });
+    
+    it('should decrease reward amount', async function(){
+      const address = await user.getAddress();
+      await rewardManager.connect(stakeManager).exit(address);
+      expect(await rewardManager.rewards(address)).to.be.equal(0);
+    });
+  });
+  describe('#getReward()', function(){
+    beforeEach(async function(){
+      await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
+      await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
+      await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
+      await increase(86400*10);
+    });
+
+    it('should be rewarded for all reward amount', async function(){
+      const earned = await rewardManager.earned(await user.getAddress());
+      await rewardManager.getReward(await user.getAddress());
+      const balance = await token.balanceOf(await user.getAddress());
+      expect(earned).to.be.equal(balance);
+    });
+
+    it('should do nothing when earned is zero', async function(){
+      await rewardManager.getReward(await owner.getAddress());
     });
   });
 });
