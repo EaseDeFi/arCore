@@ -45,8 +45,8 @@ contract BalanceManager is Ownable, IBalanceManager{
       external
       override
     {
-        Ownable.initialize();
         require(address(planManager) == address(0), "Contract already initialized.");
+        Ownable.initialize();
         planManager = IPlanManager(_planManager);
     }
 
@@ -166,9 +166,19 @@ contract BalanceManager is Ownable, IBalanceManager{
         emit PriceChange(_user, _newPrice);
     }
 
+    function perSecondPrice(address _user)
+    external
+    override
+    view
+    returns(uint256)
+    {
+        Balance memory balance = balances[_user];
+        return balance.perSecondPrice;
+    }
+
     function notifyBalanceChange(address _user) 
     internal
     {
-        planManager.updateExpireTime(_user, balances[_user].lastBalance, balances[_user].perSecondPrice); 
+        planManager.updateExpireTime(_user); 
     }
 }

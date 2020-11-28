@@ -67,12 +67,13 @@ contract PlanManager is IPlanManager {
     }
 
     function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end,  bytes32 root){
+        if(plans[_user].length == 0){
+            return(0,0,bytes32(0));
+        }
         Plan memory plan = plans[_user][plans[_user].length-1];
         //return 0 if there is no active plan
         if(plan.endTime < now){
-            start = 0;
-            end = 0;
-            root = bytes32(0);
+            return(0,0,bytes32(0));
         } else {
             start = plan.startTime;
             end = plan.endTime;
@@ -91,11 +92,10 @@ contract PlanManager is IPlanManager {
       override
     {
         // Need to get price of the protocol here
-        require(_protocols.length == _coverAmounts.length, "Input array lengths do not match.");
         if(plans[msg.sender].length > 0){
           Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
 
-          require(_generateMerkleRoot(_oldProtocols, _oldCoverAmounts) == lastPlan.merkleRoot, "Invalid old values merkleRoot different");
+          require(_generateMerkleRoot(_oldProtocols, _oldCoverAmounts) == lastPlan.merkleRoot, "Merkle Root from provided values are not correct");
           // First go through and subtract all old cover amounts.
           _removeOldTotals(_oldProtocols, _oldCoverAmounts);
           // Then go through, add new cover amounts, and make sure they do not pass cover allowed.
@@ -111,8 +111,8 @@ contract PlanManager is IPlanManager {
         // Loop through protocols, find price per second, add to rate, add coverage amount to mapping.
         for (uint256 i = 0; i < _protocols.length; i++) {
             // Amount of Ether that must be paid per DAI of coverage per second.
+            require(nftCoverPrice[_protocols[i]] != 0, "Protocol price is zero");
             //check if nftCoverPrice is not zero
-            require(nftCoverPrice[_protocols[i]] != 0, "Protocol is not supported");
             uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i] * _markup;
             newPricePerSec += pricePerSec;
         }
@@ -123,6 +123,7 @@ contract PlanManager is IPlanManager {
         uint256 balance = balanceManager.balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;
         
+        //require(_protocols.length == _coverAmounts.length, "Input array lengths do not match.");
         bytes32 merkleRoot = _generateMerkleRoot(_protocols, _coverAmounts);
         Plan memory newPlan;
         newPlan = Plan(uint128(now), uint128(endTime), merkleRoot);
@@ -200,7 +201,7 @@ contract PlanManager is IPlanManager {
 
     function planRedeemed(address _user, uint256 _planIndex, address _protocol) external override onlyClaimManager{
         Plan storage plan = plans[_user][_planIndex];
-        require(plan.endTime < now, "Cannot redeem active plan, update to ");
+        require(plan.endTime < now, "Cannot redeem active plan, update plan to redeem properly");
         plan.claimed[_protocol] = true;
     }
 
@@ -217,15 +218,17 @@ contract PlanManager is IPlanManager {
         nftCoverPrice[_protocol] = _newPrice;
     }
 
-    function updateExpireTime(address _user, uint256 _balance, uint256 _pricePerSec)
+    function updateExpireTime(address _user)
       external
       override
       onlyBalanceManager
     {
         if (plans[_user].length == 0) return;
         Plan storage plan = plans[_user][plans[_user].length-1];
+        uint256 balance = balanceManager.balanceOf(_user);
+        uint256 pricePerSec = balanceManager.perSecondPrice(_user);
         if(plan.endTime >= now){
-            plan.endTime = uint128(_balance / _pricePerSec + now);
+            plan.endTime = uint128(balance / pricePerSec + now);
         }
     }
 }

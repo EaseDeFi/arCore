@@ -8,9 +8,8 @@ contract PlanManagerMock {
   event UpdateExpireTime(address _user);
   receive() external payable{
   }
-  function updateExpireTime(address _user, uint256 _newBalance, uint256 _pricePerSec)  external {
+  function updateExpireTime(address _user)  external {
       emit UpdateExpireTime(_user);
-      _newBalance; _pricePerSec;
   }
   function mockChangePrice(address _balanceManager, address _user, uint256 _newPrice) external {
       IBalanceManager(_balanceManager).changePrice(_user, _newPrice);

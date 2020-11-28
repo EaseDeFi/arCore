@@ -10,5 +10,6 @@ interface IBalanceManager {
   function updateBalance(address _user) external;
 	function initialize(address _planManager) external;
 	function balanceOf(address _user) external view returns (uint256);
+  function perSecondPrice(address _user) external view returns(uint256);
 	function changePrice(address user, uint256 _newPricePerSec) external;
 }
