@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
 import { increase } from "../utils";
-describe.only("RewardManager", function () {
+describe("RewardManager", function () {
   let accounts: Signer[];
   let rewardManager: Contract;
   let stakeManager: Signer;
