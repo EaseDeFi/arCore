@@ -5,6 +5,8 @@ import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
 import '../interfaces/IPlanManager.sol';
+import '../interfaces/IStakeManager.sol';
+
 /**
  * @dev This contract holds all NFTs. The only time it does something is if a user requests a claim.
  * @notice We need to make sure a user can only claim when they have balance.
@@ -16,11 +18,14 @@ contract ClaimManager is Ownable {
 
     IarNFT public arNFT;
 
+    IStakeManager public stakeManager;
+
     // Mapping of hacks that we have confirmed to have happened. (keccak256(protocol ID, timestamp) => didithappen).
     mapping (bytes32 => bool) confirmedHacks;
     
     // Emitted when a new hack has been recorded.
     event ConfirmedHack(bytes32 indexed hackId, address indexed protocol, uint256 timestamp);
+    
     // Emitted when a user successfully receives a payout.
     event ClaimPayout(bytes32 indexed hackId, address indexed user, uint256 amount);
 
@@ -33,13 +38,14 @@ contract ClaimManager is Ownable {
      * @dev _planManager Address of the PlanManager Armor contract.
      * @dev __arNFT Address of the arNFT contract.
     **/
-    function initialize(address _planManager, address _arNFT)
+    function initialize(address _planManager, address _stakeManager, address _arNFT)
       public
     {
         Ownable.initialize();
         require(planManager == IPlanManager( address(0) ), "Contract already initialized.");
         planManager = IPlanManager(_planManager);
         arNFT = IarNFT(_arNFT);
+        stakeManager = IStakeManager(_stakeManager);
     }
     
     /**
@@ -59,10 +65,12 @@ contract ClaimManager is Ownable {
         // TODO check if plan is not active now => to prevent users paying more than needed
         (uint256 planIndex, bool covered) = planManager.checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path);
         require(covered, "User does not have valid amount, check path and amount");
+        
         // Put Ether into 18 decimal format.
         uint256 payment = _amount * 10 ** 18;
         planManager.planRedeemed(msg.sender, planIndex, _protocol);
         msg.sender.transfer(payment);
+        
         emit ClaimPayout(hackId, msg.sender, _amount);
     }
     
@@ -74,18 +82,12 @@ contract ClaimManager is Ownable {
     function submitNft(uint256 _nftId,uint256 _hackTime)
       external
     {
-
-        (/*cid*/, /*status*/, /*sumAssured*/, uint16 coverPeriod, uint256 validUntil, address scAddress,
-         bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
+        (/*cid*/, uint8 status, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress,
+        bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
         bytes32 hackId = keccak256(abi.encodePacked(scAddress, _hackTime));
         
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         require(currencyCode == ETH_SIG, "Only ETH nft can be submitted");
-        // Call arNFT to ensure token had not been claimed
-        // Status must be Active, ClaimDenied, or CoverExpired.
-        // TODO: check if it is ok to submit expired cover
-        // Seems this can be handled by nxm
-        //require(status == 0 || status == 2 || status == 3);
         
         // Make sure arNFT was active at the time
         require(validUntil >= _hackTime, "arNFT was not valid at time of hack.");
@@ -93,6 +95,10 @@ contract ClaimManager is Ownable {
         // Make sure NFT was purchased before hack.
         uint256 generationTime = validUntil - (uint256(coverPeriod) * 1 days);
         require(generationTime <= _hackTime, "arNFT had not been purchased before hack.");
+
+        // Subtract amount it was protecting from total staked for the protocol if it is not expired (in which case it already has been subtracted).
+        uint256 weiSumAssured = sumAssured * (10 ** 18);
+        if (status != 3) stakeManager.subtractTotal(_nftId, scAddress, weiSumAssured);
 
         arNFT.submitClaim(_nftId);
     }
@@ -110,6 +116,18 @@ contract ClaimManager is Ownable {
     }
     
     /**
+     * @dev Used by StakeManager in case a user wants to withdraw their NFT.
+     * @param _to Address to send the NFT to.
+     * @param _nftId ID of the NFT to be withdrawn.
+    **/
+    function transferNft(address _to, uint256 _nftId)
+      external
+    {
+        require(msg.sender == address(stakeManager), "Sender must be StakeManager.");
+        arNFT.safeTransferFrom(address(this), _to, _nftId);
+    }
+    
+    /**
      * @dev Called by Armor for now--we confirm a hack happened and give a timestamp for what time it was.
      * @param _protocol The address of the protocol that has been hacked (address that would be on yNFT).
      * @param _hackTime The timestamp of the time the hack occurred.
@@ -123,4 +141,5 @@ contract ClaimManager is Ownable {
         confirmedHacks[hackId] = true;
         emit ConfirmedHack(hackId, _protocol, _hackTime);
     }
+    
 }

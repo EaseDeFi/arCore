@@ -71,6 +71,7 @@ contract PlanManager is IPlanManager {
             return(0,0,bytes32(0));
         }
         Plan memory plan = plans[_user][plans[_user].length-1];
+        
         //return 0 if there is no active plan
         if(plan.endTime < now){
             return(0,0,bytes32(0));
@@ -84,7 +85,7 @@ contract PlanManager is IPlanManager {
     /*
      * @dev User can update their plan for cover amount on any protocol.
      * @param _protocols Addresses of the protocols that we want coverage for.
-     * @param _coverAmounts The amount of coverage desired in FULL DAI (0 decimals).
+     * @param _coverAmounts The amount of coverage desired in WEI.
      * @notice Let's simplify this somehow--even just splitting into different functions.
     **/
     function updatePlan(address[] calldata _oldProtocols, uint256[] calldata _oldCoverAmounts, address[] calldata _protocols, uint256[] calldata _coverAmounts)
@@ -96,10 +97,13 @@ contract PlanManager is IPlanManager {
           Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
 
           require(_generateMerkleRoot(_oldProtocols, _oldCoverAmounts) == lastPlan.merkleRoot, "Merkle Root from provided values are not correct");
+          
           // First go through and subtract all old cover amounts.
           _removeOldTotals(_oldProtocols, _oldCoverAmounts);
+          
           // Then go through, add new cover amounts, and make sure they do not pass cover allowed.
           _addNewTotals(_protocols, _coverAmounts);
+          
           // Set old plan to have ended now.
           lastPlan.endTime = uint128(now);
         } else {
@@ -108,18 +112,16 @@ contract PlanManager is IPlanManager {
 
         uint256 newPricePerSec;
         uint256 _markup = markup;
+        
         // Loop through protocols, find price per second, add to rate, add coverage amount to mapping.
         for (uint256 i = 0; i < _protocols.length; i++) {
-            // Amount of Ether that must be paid per DAI of coverage per second.
             require(nftCoverPrice[_protocols[i]] != 0, "Protocol price is zero");
-            //check if nftCoverPrice is not zero
-            uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i] * _markup;
+            
+            // nftCoverPrice is per full Ether, so a cover amont in Wei must be divided by 18 decimals after.
+            uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i] * _markup / (10 ** 18);
             newPricePerSec += pricePerSec;
         }
 
-        /**
-         * @dev can for sure separate this shit into another function.
-        **/
         uint256 balance = balanceManager.balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;
         
@@ -227,6 +229,7 @@ contract PlanManager is IPlanManager {
         Plan storage plan = plans[_user][plans[_user].length-1];
         uint256 balance = balanceManager.balanceOf(_user);
         uint256 pricePerSec = balanceManager.perSecondPrice(_user);
+        
         if(plan.endTime >= now){
             plan.endTime = uint128(balance / pricePerSec + now);
         }

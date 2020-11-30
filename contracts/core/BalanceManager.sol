@@ -141,6 +141,7 @@ contract BalanceManager is Ownable, IBalanceManager{
         balance.lastBalance = newBalance;
         balance.lastTime = block.timestamp;
         emit Loss(_user, loss);
+        
         if(newBalance == 0) {
             // do something when expired
             // maybe we should set price to zero
@@ -148,6 +149,7 @@ contract BalanceManager is Ownable, IBalanceManager{
             balance.perSecondPrice = 0;
             emit PriceChange(_user, 0);
         }
+        
         balances[_user] = balance;
     }
 

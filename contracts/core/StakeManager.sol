@@ -16,10 +16,6 @@ contract StakeManager is Ownable {
     
     using SafeMath for uint;
     
-    /**
-     * @notice  Don't even know if these are needed since the tokens are on separate contracts
-     *          and we can just differentiate that way.
-    **/
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
 
     // external contract addresses
@@ -27,28 +23,38 @@ contract StakeManager is Ownable {
 
     // internal contract addresses 
     IRewardManager public rewardManager;
+    
     IPlanManager public planManager;
+    
     // All NFTs will be immediately sent to the claim manager.
     IClaimManager public claimManager;
+    
+    // Amount of time--in seconds--a user must wait to withdraw an NFT.
+    uint256 withdrawalDelay;
     
     // Protocols that staking is allowed for. We may not allow all NFTs.
     mapping (address => bool) public allowedProtocols;
     
-    // The total amount of cover that is currently being staked.
-    // mapping (scAddress => cover amount)
+    // The total amount of cover that is currently being staked. scAddress => cover amount
     mapping (address => uint256) public totalStakedAmount;
     
-    // Mapping to keep track of which NFT is owned by whom.
-    mapping (uint256 => address) nftOwners;
-    
-    // Price (in Ether per second) of an NFT. We must save this to retain eth => dai conversion from the staking.
-    mapping (uint256 => uint256) nftPrices;
-    
+    // Mapping to keep track of which NFT is owned by whom. NFT ID => owner address.
+    mapping (uint256 => address) public nftOwners;
+
+    // When the NFT can be withdrawn. NFT ID => Unix timestamp.
+    mapping (uint256 => uint256) public pendingWithdrawals;
+
+    // Track if the NFT was submitted, in which case total staked has already been lowered.
+    mapping (uint256 => bool) public submitted;
+
     // Event launched when an NFT is staked.
     event StakedNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
-    
+
     // Event launched when an NFT expires.
     event ExpiredNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
+    
+    // Event launched when an NFT expires.
+    event WithdrawNFT(address indexed user, uint256 nftId);
     
     /**
      * @dev Construct the contract with the yNft contract.
@@ -59,10 +65,14 @@ contract StakeManager is Ownable {
     {
         Ownable.initialize();
         require(address(arNFT) == address(0), "Contract already initialized.");
+        
         arNFT = IarNFT(_nftContract);
         rewardManager = IRewardManager(_rewardManager);
         planManager = IPlanManager(_planManager);
         claimManager = IClaimManager(_claimManager);
+        
+        // Let's be explicit. Testnet will have 0 to easily adjust stakers.
+        withdrawalDelay = 0;
     }
     
     /**
@@ -104,14 +114,51 @@ contract StakeManager is Ownable {
         address user = nftOwners[_nftId];
         require(user != address(0), "NFT does not belong here.");
         
+        uint256 weiSumAssured = sumAssured * (10 ** 18);
         uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
-        
-        _subtractCovers(user, sumAssured, secondPrice, scAddress);
+        _subtractCovers(user, _nftId, weiSumAssured, secondPrice, scAddress);
         
         // Returns the caller some gas as well as ensure this function cannot be called again.
         delete nftOwners[_nftId];
         
-        emit ExpiredNFT(user, scAddress, _nftId, sumAssured, secondPrice, coverPeriod, block.timestamp);
+        emit ExpiredNFT(user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
+    }
+
+    /**
+     * @dev A user may call to withdraw their NFT. This may have a delay added to it.
+     * @param _nftId ID of the NFT to withdraw.
+    **/
+    function withdrawNft(uint256 _nftId)
+      public
+    {
+        require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
+        
+        // Check when this NFT is allowed to be withdrawn. If 0, set it.
+        uint256 withdrawalTime = pendingWithdrawals[_nftId];
+        
+        if (withdrawalTime == 0) {
+            withdrawalTime = block.timestamp + withdrawalDelay;
+            pendingWithdrawals[_nftId] = withdrawalTime;
+            return;
+        } else if (withdrawalTime > block.timestamp) {
+            return;
+        }
+        
+        removeExpiredNft(_nftId);
+        claimManager.transferNft(msg.sender, _nftId);
+    }
+
+    /**
+     * @dev Subtract from total staked. Used by ClaimManager in case NFT is submitted.
+     * @param _protocol Address of the protocol to subtract from.
+     * @param _subtractAmount Amount of staked to subtract.
+    **/
+    function subtractTotal(uint256 _nftId, address _protocol, uint256 _subtractAmount)
+      external
+    {
+        require(msg.sender == address(claimManager), "Sender must be ClaimManager.");
+        totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_subtractAmount);
+        submitted[_nftId] = true;
     }
 
     /**
@@ -146,18 +193,19 @@ contract StakeManager is Ownable {
 
         // Update PlanManager to use the correct price for the protocol.
         // Find price per amount here to update plan manager correctly.
-        uint256 pricePerAmount = secondPrice / sumAssured;
+        uint256 pricePerEth = secondPrice / sumAssured;
         
-        planManager.changePrice(scAddress, pricePerAmount);
+        planManager.changePrice(scAddress, pricePerEth);
         
         arNFT.transferFrom(_user, address(claimManager), _nftId);
 
         // Save owner of NFT.
         nftOwners[_nftId] = _user;
 
-        _addCovers(_user, sumAssured, secondPrice, scAddress);
+        uint256 weiSumAssured = sumAssured * (10 ** 18);
+        _addCovers(_user, weiSumAssured, secondPrice, scAddress);
         
-        emit StakedNFT(_user, scAddress, _nftId, sumAssured, secondPrice, coverPeriod, block.timestamp);
+        emit StakedNFT(_user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
     }
     
     /**
@@ -169,9 +217,6 @@ contract StakeManager is Ownable {
     function _addCovers(address _user, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        /**
-         * @notice This needs to point to user cover on RewardManager.
-        **/
         rewardManager.stake(_user, _coverPrice);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
     }
@@ -179,16 +224,16 @@ contract StakeManager is Ownable {
     /**
      * @dev Subtract from the cover amount for the user and contract overall.
      * @param _user The user who is having the token removed.
+     * @param _nftId ID of the NFT being used--must check if it has been submitted.
      * @param _coverAmount The amount of cover being removed.
+     * @param _coverPrice Price that the user was getting paid.
+     * @param _protocol The protocol that this NFT protected.
     **/
-    function _subtractCovers(address _user, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
+    function _subtractCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        /**
-         * @notice This needs to point to user cover on RewardManager.
-        **/
         rewardManager.withdraw(_user, _coverPrice);
-        totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
+        if (!submitted[_nftId]) totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     
     /**
@@ -203,7 +248,7 @@ contract StakeManager is Ownable {
       view
     {
         require(_validUntil > now + 86400, "NFT is expired or within 1 day of expiry.");
-        // should change this to check status not claimId
+        // TODO: should change this to check status not claimId
         require(_coverStatus == 0, "arNFT claim is already in progress.");
         require(allowedProtocols[_scAddress], "Protocol is not allowed to be staked.");
         require(_coverCurrency == ETH_SIG, "Only Ether arNFTs may be staked.");
@@ -232,4 +277,16 @@ contract StakeManager is Ownable {
     {
         allowedProtocols[_protocol] = _allow;    
     }
+    
+    /**
+     * @dev Allow the owner to change the amount of delay to withdraw an NFT.
+     * @param _withdrawalDelay The amount of time--in seconds--to delay an NFT withdrawal.
+    **/
+    function changeWithdrawalDelay(uint256 _withdrawalDelay)
+      external
+      onlyOwner
+    {
+        withdrawalDelay = _withdrawalDelay;
+    }
+    
 }

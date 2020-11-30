@@ -41,6 +41,7 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 contract RewardManager is BalanceWrapper, Ownable, IRewardDistributionRecipient, IRewardManager{
     using SafeERC20 for IERC20;
 
+    // Reward token is 0 if Ether is the reward.
     IERC20 public rewardToken;
     address public stakeController;
     address public rewardDistribution;
@@ -78,7 +79,7 @@ contract RewardManager is BalanceWrapper, Ownable, IRewardDistributionRecipient,
       override
     {
         Ownable.initialize();
-        require(address(rewardToken) == address(0), "Contract is already initialized.");
+        require(address(stakeController) == address(0), "Contract is already initialized.");
         stakeController = _stakeController;
         rewardToken = IERC20(_rewardToken);
         rewardDistribution = _rewardDistribution;
@@ -131,28 +132,34 @@ contract RewardManager is BalanceWrapper, Ownable, IRewardDistributionRecipient,
         emit BalanceWithdrawn(user, amount);
     }
 
-    function exit(address user) external override {
+    function exit(address payable user) external override {
         withdraw(user, balanceOf(user));
         getReward(user);
     }
 
-    function getReward(address user) public override updateReward(user) {
+    function getReward(address payable user) public override updateReward(user) {
         uint256 reward = earned(user);
         if (reward > 0) {
             rewards[user] = 0;
-            rewardToken.safeTransfer(user, reward);
+            
+            if ( address(rewardToken) == address(0) ) user.transfer(reward);
+            else rewardToken.safeTransfer(user, reward);
+            
             emit RewardPaid(user, reward);
         }
     }
 
     function notifyRewardAmount(uint256 reward)
         external
+        payable
         override
         onlyRewardDistribution
         updateReward(address(0))
     {
         //this will make sure tokens are in the reward pool
-        rewardToken.safeTransferFrom(msg.sender, address(this), reward);
+        if ( address(rewardToken) == address(0) ) require(msg.value == reward, "Correct reward was not sent.");
+        else rewardToken.safeTransferFrom(msg.sender, address(this), reward);
+        
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(DURATION);
         } else {
