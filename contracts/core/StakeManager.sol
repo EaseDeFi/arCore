@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
@@ -8,11 +10,11 @@ import '../interfaces/IarNFT.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
-
+import '../interfaces/IStakeManager.sol';
 /**
  * @dev Encompasses all functions taken by stakers.
 **/
-contract StakeManager is Ownable {
+contract StakeManager is Ownable, IStakeManager {
     
     using SafeMath for uint;
     
@@ -62,10 +64,10 @@ contract StakeManager is Ownable {
     **/
     function initialize(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
       public
+      override
     {
-        Ownable.initialize();
         require(address(arNFT) == address(0), "Contract already initialized.");
-        
+        Ownable.initialize();
         arNFT = IarNFT(_nftContract);
         rewardManager = IRewardManager(_rewardManager);
         planManager = IPlanManager(_planManager);
@@ -155,6 +157,7 @@ contract StakeManager is Ownable {
     **/
     function subtractTotal(uint256 _nftId, address _protocol, uint256 _subtractAmount)
       external
+      override
     {
         require(msg.sender == address(claimManager), "Sender must be ClaimManager.");
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_subtractAmount);
@@ -169,6 +172,7 @@ contract StakeManager is Ownable {
     **/
     function allowedCover(address _protocol, uint256 _totalBorrowedAmount)
       public
+      override
       view
     returns (bool)
     {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // File: contracts/libraries/Context.sol
 
 pragma solidity ^0.6.0;

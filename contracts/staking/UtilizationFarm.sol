@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
@@ -143,6 +145,7 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
 
     function notifyRewardAmount(uint256 reward)
         external
+        payable
         override
         onlyRewardDistribution
         updateReward(address(0))

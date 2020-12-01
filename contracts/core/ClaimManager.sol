@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
@@ -6,12 +8,12 @@ import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IStakeManager.sol';
-
+import '../interfaces/IClaimManager.sol';
 /**
  * @dev This contract holds all NFTs. The only time it does something is if a user requests a claim.
  * @notice We need to make sure a user can only claim when they have balance.
 **/
-contract ClaimManager is Ownable {
+contract ClaimManager is Ownable, IClaimManager {
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
 
     IPlanManager public planManager;
@@ -40,6 +42,7 @@ contract ClaimManager is Ownable {
     **/
     function initialize(address _planManager, address _stakeManager, address _arNFT)
       public
+      override
     {
         Ownable.initialize();
         require(planManager == IPlanManager( address(0) ), "Contract already initialized.");
@@ -122,6 +125,7 @@ contract ClaimManager is Ownable {
     **/
     function transferNft(address _to, uint256 _nftId)
       external
+      override
     {
         require(msg.sender == address(stakeManager), "Sender must be StakeManager.");
         arNFT.safeTransferFrom(address(this), _to, _nftId);

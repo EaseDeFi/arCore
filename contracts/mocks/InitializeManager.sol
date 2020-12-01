@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.6.6;
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IClaimManager.sol';
@@ -17,7 +19,7 @@ contract InitializeManager {
       public
     {
         IBalanceManager(_balanceManager).initialize(_planManager);
-        IClaimManager(_claimManager).initialize(_planManager, _arNFT);
+        IClaimManager(_claimManager).initialize(_planManager, _stakeManager, _arNFT);
         IPlanManager(_planManager).initialize(_stakeManager, _balanceManager, _claimManager);
         IRewardManager(_rewardManager).initialize(_armorToken, _stakeManager, msg.sender);
         IStakeManager(_stakeManager).initialize(_arNFT, _rewardManager, _planManager, _claimManager);

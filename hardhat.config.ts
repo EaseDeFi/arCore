@@ -1,9 +1,14 @@
 import "@nomiclabs/hardhat-waffle";
 import "solidity-coverage";
+import "hardhat-spdx-license-identifier";
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
 export default {
+  spdxLicenseIdentifier: {
+    overwrite: true,
+    runOnCompile: true,
+  },
   solidity: {
     compilers :[
       {
