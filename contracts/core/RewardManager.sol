@@ -9,7 +9,6 @@ import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IRewardManager.sol';
-import '../interfaces/IRewardDistributionRecipient.sol';
 
 /**
  * @dev RewardManager is nearly the exact same contract as Utilization Farm.
@@ -40,7 +39,7 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract RewardManager is BalanceWrapper, Ownable, IRewardDistributionRecipient, IRewardManager{
+contract RewardManager is BalanceWrapper, Ownable, IRewardManager{
     using SafeERC20 for IERC20;
 
     // Reward token is 0 if Ether is the reward.
