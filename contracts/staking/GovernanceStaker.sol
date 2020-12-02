@@ -128,7 +128,10 @@ contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient
         uint256 reward = earned(msg.sender);
         if (reward > 0) {
             rewards[msg.sender] = 0;
-            rewardToken.safeTransfer(msg.sender, reward);
+            
+            if ( address(rewardToken) == address(0) ) msg.sender.transfer(reward);
+            else rewardToken.safeTransfer(msg.sender, reward);
+            
             emit RewardPaid(msg.sender, reward);
         }
     }
@@ -140,6 +143,10 @@ contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient
         onlyRewardDistribution
         updateReward(address(0))
     {
+        //this will make sure tokens are in the reward pool
+        if ( address(rewardToken) == address(0) ) require(msg.value == reward, "Correct reward was not sent.");
+        else rewardToken.safeTransferFrom(msg.sender, address(this), reward);
+        
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(DURATION);
         } else {
@@ -151,4 +158,5 @@ contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient
         periodFinish = block.timestamp.add(DURATION);
         emit RewardAdded(reward);
     }
+    
 }

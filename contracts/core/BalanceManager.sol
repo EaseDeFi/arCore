@@ -3,23 +3,45 @@
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
+import '../staking/GovernanceStaker.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
+import '../interfaces/IRewardManager.sol';
+
 //import 'hardhat/console.sol';
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
  **/
-contract BalanceManager is Ownable, IBalanceManager{
+contract BalanceManager is Ownable, IBalanceManager {
 
     using SafeMath for uint;
 
     IPlanManager public planManager;
 
+    IRewardManager public rewardManager;
+
+    GovernanceStaker public governanceStaker;
+    
+    // Wallet of the developers for if a developer fee is being paid.
+    address public devWallet;
+
     // keep track of monthly payments and start/end of those
     mapping (address => Balance) public balances;
+
+    // user => referrer
+    mapping (address => address) public referrers;
+
+    // Percent of funds that go to development--start with 0 and can change.
+    uint256 public devPercent;
+
+    // Percent of funds referrers receive. 20 = 2%.
+    uint256 public refPercent;
+
+    // Percent of funds given to governance stakers.
+    uint256 public govPercent;
 
     // With lastTime and secondPrice we can determine balance by second.
     // Second price is in ETH so we must convert.
@@ -43,29 +65,41 @@ contract BalanceManager is Ownable, IBalanceManager{
     /**
      * @param _planManager Address of the PlanManager contract.
      **/
-    function initialize(address _planManager)
+    function initialize(address _planManager, address _governanceStaker, address _rewardManager, address _devWallet)
       external
       override
     {
         require(address(planManager) == address(0), "Contract already initialized.");
         Ownable.initialize();
         planManager = IPlanManager(_planManager);
+        governanceStaker = GovernanceStaker(_governanceStaker);
+        rewardManager = IRewardManager(_rewardManager);
+        devWallet = _devWallet;
+        devPercent = 0;
+        refPercent = 25;
+        govPercent = 75;
     }
 
     /**
      * @dev Borrower deposits an amount of Dai to pay for coverage.
+     * @param _referrer User who referred the depositor.
      **/
-    function deposit() 
+    function deposit(address _referrer) 
     external
     payable
     override
     update(msg.sender)
     {
+        if ( referrers[msg.sender] == address(0) ) {
+            referrers[msg.sender] = _referrer != address(0) ? _referrer : devWallet;
+            emit ReferralAdded(_referrer, msg.sender);
+        }
+        
         require(msg.value > 0, "No Ether was deposited.");
 
         balances[msg.sender].lastBalance = balances[msg.sender].lastBalance.add(msg.value);
         balances[msg.sender].lastTime = block.timestamp;
-        notifyBalanceChange(msg.sender);
+        _notifyBalanceChange(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -85,7 +119,7 @@ contract BalanceManager is Ownable, IBalanceManager{
         balance.lastBalance = balance.lastBalance.sub(_amount);
         balances[msg.sender] = balance;
         
-        notifyBalanceChange(msg.sender);
+        _notifyBalanceChange(msg.sender);
         // think we can just use call.value()()
         msg.sender.transfer(_amount);
         emit Withdraw(msg.sender, _amount);
@@ -132,12 +166,8 @@ contract BalanceManager is Ownable, IBalanceManager{
 
         // newBalance should never be greater than last balance.
         uint256 loss = balance.lastBalance.sub(newBalance);
-
-        // Kind of a weird way to do it, but we're giving owner the balance.
-        // CHANGED : _user -> owner 
-        // should check if it's ok
-        // I think it should go to nft stakers or something like balance pool
-        balances[owner()].lastBalance += loss;
+    
+        _payPercents(_user, loss);
 
         // Update storage balance.
         balance.lastBalance = newBalance;
@@ -156,7 +186,7 @@ contract BalanceManager is Ownable, IBalanceManager{
     }
 
     /**
-     * @dev Armor has the ability to change the price that a user is paying for their insurance.
+     * @dev Armor controller has the ability to change the price that a user is paying for their insurance.
      * @param _user The user whose price we are changing.
      * @param _newPrice the new price per second that the user will be paying.
      **/
@@ -170,6 +200,22 @@ contract BalanceManager is Ownable, IBalanceManager{
         emit PriceChange(_user, _newPrice);
     }
 
+    /**
+     * @dev Send funds to governanceStaker and rewardManager (don't want to have to send them with every transaction).
+    **/
+    function releaseFunds()
+      public
+    {
+       uint256 govBalance = balances[address(governanceStaker)].lastBalance;
+       balances[address(governanceStaker)].lastBalance = 0;
+       
+       uint256 rewardBalance = balances[address(rewardManager)].lastBalance;
+       balances[address(rewardManager)].lastBalance = 0;
+       
+       governanceStaker.notifyRewardAmount{value: govBalance}(govBalance);
+       rewardManager.notifyRewardAmount{value: rewardBalance}(rewardBalance);
+    }
+
     function perSecondPrice(address _user)
     external
     override
@@ -179,10 +225,64 @@ contract BalanceManager is Ownable, IBalanceManager{
         Balance memory balance = balances[_user];
         return balance.perSecondPrice;
     }
+    
+    /**
+     * @dev Give rewards to different places.
+     * @param _user User that's being charged.
+     * @param _charged Amount of funds charged to the user.
+    **/
+    function _payPercents(address _user, uint256 _charged)
+      internal
+    {
+        // percents: 20 = 2%.
+        uint256 refAmount = referrers[_user] != address(0) ? _charged * refPercent / 1000 : 0;
+        uint256 devAmount = _charged * devPercent / 1000;
+        uint256 govAmount = _charged * govPercent / 1000;
+        uint256 nftAmount = _charged.sub(refAmount).sub(devAmount).sub(govAmount);
+        
+        if (refAmount > 0) {
+            balances[ referrers[_user] ].lastBalance = balances[ referrers[_user] ].lastBalance.add(refAmount);
+            emit AffiliatePaid(_user, referrers[_user], refAmount);
+        }
+        if (devAmount > 0) balances[devWallet].lastBalance = balances[devWallet].lastBalance.add(devAmount);
+        if (govAmount > 0) balances[address(governanceStaker)].lastBalance = balances[address(governanceStaker)].lastBalance.add(govAmount);
+        if (nftAmount > 0) balances[address(rewardManager)].lastBalance = balances[address(rewardManager)].lastBalance.add(nftAmount);
+    }
 
-    function notifyBalanceChange(address _user) 
+    function _notifyBalanceChange(address _user) 
     internal
     {
         planManager.updateExpireTime(_user); 
     }
+    
+    /**
+     * @dev Controller can change how much referrers are paid.
+    **/
+    function changeRefPercent(uint256 _newPercent)
+      external
+      onlyOwner
+    {
+        refPercent = _newPercent;
+    }
+    
+    /**
+     * @dev Controller can change how much governance is paid.
+    **/
+    function changeGovPercent(uint256 _newPercent)
+      external
+      onlyOwner
+    {
+        govPercent = _newPercent;
+    }
+    
+    /**
+     * @dev Controller can change how much developers are paid.
+    **/
+    function changeDevPercent(uint256 _newPercent)
+      external
+      onlyOwner
+    {
+        devPercent = _newPercent;
+    }
+    
 }

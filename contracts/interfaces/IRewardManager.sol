@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT
-
 pragma solidity ^0.6.6;
 
 interface IRewardManager {
@@ -8,4 +6,5 @@ interface IRewardManager {
 	function withdraw(address _user, uint256 _coverPrice) external;
 	function exit(address payable _user) external;
   function getReward(address payable _user) external;
+  function notifyRewardAmount(uint256 _amount) external payable;
 }
