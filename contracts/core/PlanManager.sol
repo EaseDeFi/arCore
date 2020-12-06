@@ -120,9 +120,13 @@ contract PlanManager is IPlanManager {
             require(nftCoverPrice[_protocols[i]] != 0, "Protocol price is zero");
             
             // nftCoverPrice is per full Ether, so a cover amont in Wei must be divided by 18 decimals after.
-            uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i] * _markup / (10 ** 18);
+            // ** This can result in overflow, we need safemath for this
+            uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i];
+            // ** This needs safemath too
             newPricePerSec += pricePerSec;
         }
+
+        newPricePerSec = newPricePerSec * _markup / (10**18);
 
         uint256 balance = balanceManager.balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;

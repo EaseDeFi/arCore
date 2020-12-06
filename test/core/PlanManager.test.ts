@@ -19,7 +19,7 @@ describe("PlanManager", function () {
   //accounts settings
   let user: Signer;
   let unknownUser: Signer;
-  const coverAmount = BigNumber.from(100);
+  const coverAmount = BigNumber.from("100000000000000000000");
   const price = BigNumber.from(1); // this means 1 wei per second
   const userBalance = BigNumber.from(1000000);
   beforeEach(async function () {

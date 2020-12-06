@@ -31,6 +31,10 @@ contract ClaimManager is Ownable, IClaimManager {
     // Emitted when a user successfully receives a payout.
     event ClaimPayout(bytes32 indexed hackId, address indexed user, uint256 amount);
 
+    modifier onlyStakeManager() {
+        require(msg.sender == address(stakeManager), "only stake manager can call this function");
+        _;
+    }
     // for receiving redeemed ether
     receive() external payable {
     }
@@ -126,8 +130,8 @@ contract ClaimManager is Ownable, IClaimManager {
     function transferNft(address _to, uint256 _nftId)
       external
       override
+      onlyStakeManager
     {
-        require(msg.sender == address(stakeManager), "Sender must be StakeManager.");
         arNFT.safeTransferFrom(address(this), _to, _nftId);
     }
     

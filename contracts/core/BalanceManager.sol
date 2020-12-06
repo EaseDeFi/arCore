@@ -10,7 +10,6 @@ import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
 
-//import 'hardhat/console.sol';
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -43,6 +42,9 @@ contract BalanceManager is Ownable, IBalanceManager {
     // Percent of funds given to governance stakers.
     uint256 public govPercent;
 
+    // Denominator used to when distributing tokens 1000 == 100%
+    uint256 public constant DENOMINATOR = 1000;
+
     // With lastTime and secondPrice we can determine balance by second.
     // Second price is in ETH so we must convert.
     struct Balance {
@@ -69,19 +71,22 @@ contract BalanceManager is Ownable, IBalanceManager {
       external
       override
     {
+        require(_planManager != address(0), "plan manager cannot be zero address");
+        require(_governanceStaker != address(0), "governance staker cannot be zero address");
+        require(_rewardManager != address(0), "reward manager cannot be zero address");
         require(address(planManager) == address(0), "Contract already initialized.");
         Ownable.initialize();
         planManager = IPlanManager(_planManager);
         governanceStaker = GovernanceStaker(_governanceStaker);
         rewardManager = IRewardManager(_rewardManager);
         devWallet = _devWallet;
-        devPercent = 0;
-        refPercent = 25;
-        govPercent = 75;
+        devPercent = 0;     // 0 %
+        refPercent = 25;    // 2.5%
+        govPercent = 75;    // 7.5%
     }
 
     /**
-     * @dev Borrower deposits an amount of Dai to pay for coverage.
+     * @dev Borrower deposits an amount of ETH to pay for coverage.
      * @param _referrer User who referred the depositor.
      **/
     function deposit(address _referrer) 
@@ -235,9 +240,9 @@ contract BalanceManager is Ownable, IBalanceManager {
       internal
     {
         // percents: 20 = 2%.
-        uint256 refAmount = referrers[_user] != address(0) ? _charged * refPercent / 1000 : 0;
-        uint256 devAmount = _charged * devPercent / 1000;
-        uint256 govAmount = _charged * govPercent / 1000;
+        uint256 refAmount = referrers[_user] != address(0) ? _charged * refPercent / DENOMINATOR : 0;
+        uint256 devAmount = _charged * devPercent / DENOMINATOR;
+        uint256 govAmount = _charged * govPercent / DENOMINATOR;
         uint256 nftAmount = _charged.sub(refAmount).sub(devAmount).sub(govAmount);
         
         if (refAmount > 0) {
@@ -262,6 +267,7 @@ contract BalanceManager is Ownable, IBalanceManager {
       external
       onlyOwner
     {
+        require(_newPercent <= DENOMINATOR, "new percent cannot be bigger than DENOMINATOR");
         refPercent = _newPercent;
     }
     
@@ -272,6 +278,7 @@ contract BalanceManager is Ownable, IBalanceManager {
       external
       onlyOwner
     {
+        require(_newPercent <= DENOMINATOR, "new percent cannot be bigger than DENOMINATOR");
         govPercent = _newPercent;
     }
     
@@ -282,6 +289,7 @@ contract BalanceManager is Ownable, IBalanceManager {
       external
       onlyOwner
     {
+        require(_newPercent <= DENOMINATOR, "new percent cannot be bigger than DENOMINATOR");
         devPercent = _newPercent;
     }
     

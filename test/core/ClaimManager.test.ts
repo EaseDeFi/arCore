@@ -30,7 +30,7 @@ describe("ClaimManager", function () {
     accounts = await ethers.getSigners(); 
     user = accounts[4];
     owner = accounts[0];
-    await claimManager.initialize(planManager.address, arNFT.address);
+    await claimManager.initialize(planManager.address, stakeManager.address, arNFT.address);
     await stakeManager.initialize(arNFT.address, rewardManager.address, planManager.address, claimManager.address);
   });
 

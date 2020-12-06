@@ -5,52 +5,66 @@ describe("BalanceManager", function () {
   let accounts: Signer[];
   let balanceManager: Contract;
   let planManager: Contract;
+  let rewardManager: Contract;
+  let governanceStaker: Contract;
+  let token: Contract;
   let user: Signer;
+  let dev: Signer;
+  let referrer: Signer;
   beforeEach(async function () {
     const BalanceFactory = await ethers.getContractFactory("BalanceManager");
     accounts = await ethers.getSigners();
+    user = accounts[3];
+    dev = accounts[4];
+    referrer = accounts[5];
     const PlanFactory = await ethers.getContractFactory("PlanManagerMock");
     planManager = await PlanFactory.deploy();
-    user = accounts[3];
+    const TokenFactory = await ethers.getContractFactory("ArmorToken");
+    token = await TokenFactory.deploy();
+    const RewardFactory = await ethers.getContractFactory("RewardManager");
+    rewardManager = await RewardFactory.deploy();
+    const GovernanceStakerFactory = await ethers.getContractFactory("GovernanceStaker");
+    governanceStaker = await GovernanceStakerFactory.deploy(token.address, constants.AddressZero);
     balanceManager = await BalanceFactory.deploy();
-    await balanceManager.initialize(planManager.address);
+    await balanceManager.initialize(planManager.address, governanceStaker.address, rewardManager.address, await dev.getAddress());
+    await rewardManager.initialize(token.address, await user.getAddress(), balanceManager.address);
   });
 
   describe("#initialize()", function() {
     it("should fail if already initialized", async function(){
-      await expect(balanceManager.connect(user).initialize(planManager.address)).to.be.revertedWith("Contract already initialized");
+      await expect(balanceManager.connect(user).initialize(planManager.address, governanceStaker.address, rewardManager.address, await dev.getAddress())).to.be.revertedWith("Contract already initialized");
     });
   });
 
   describe("#deposit()", function () {
     const amount = ethers.BigNumber.from("1000000");
     it('should fail if msg.value is zero', async function(){
-      await expect(balanceManager.connect(user).deposit()).to.be.revertedWith("No Ether was deposited");
+      await expect(balanceManager.connect(user).deposit(await referrer.getAddress())).to.be.revertedWith("No Ether was deposited");
     });
     it("should update balance", async function(){
-      await balanceManager.connect(user).deposit({value:amount});
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
       expect('updateBalance').to.be.calledOnContract(balanceManager);
     });
     it("should be able to deposit ether", async function (){
-      await balanceManager.connect(user).deposit({value:amount});
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
     });
 
     it("should update balance of msg.sender", async function (){
       const balanceBefore = (await balanceManager.balances(user.getAddress())).lastBalance;
-      await balanceManager.connect(user).deposit({value:amount});
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
       const balanceAfter = (await balanceManager.balances(user.getAddress())).lastBalance;
       expect(balanceAfter.toString()).to.equal(balanceBefore.add(amount).toString());
     });
 
     it("should emit Deposit Event", async function (){
-      await expect(balanceManager.connect(user).deposit({value:amount})).to.emit(balanceManager, 'Deposit').withArgs((await user.getAddress()), amount.toString());
+      await expect(balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount})).to.emit(balanceManager, 'Deposit').withArgs((await user.getAddress()), amount.toString());
     });
   });
 
   describe("#withdraw()", function () {
     const amount = ethers.BigNumber.from("1000000");
     beforeEach(async function (){
-      await balanceManager.connect(user).deposit({value:amount});
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
     });
     it("should update balance", async function(){
       await balanceManager.connect(user).withdraw(amount);
