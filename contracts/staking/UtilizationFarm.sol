@@ -8,7 +8,7 @@ import '../general/BalanceWrapper.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
-import '../interfaces/IRewardDistributionRecipient.sol';
+import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 
 /**
  * @dev UtilizationFarm is nearly the exact same contract as RewardManager.
@@ -39,7 +39,7 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipient {
+contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipientTokenOnly {
     using SafeERC20 for IERC20;
 
     IERC20 public rewardToken;
@@ -145,11 +145,11 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
 
     function notifyRewardAmount(uint256 reward)
         external
-        payable
         override
         onlyRewardDistribution
         updateReward(address(0))
     {
+        rewardToken.safeTransferFrom(msg.sender, address(this), reward);
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(DURATION);
         } else {

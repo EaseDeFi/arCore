@@ -68,6 +68,7 @@ contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient
     constructor(address _stakeToken, address _rewardToken)
       public
     {
+        Ownable.initialize();
         stakeToken = IERC20(_stakeToken);
         rewardToken = IERC20(_rewardToken);
     }
@@ -144,8 +145,13 @@ contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient
         updateReward(address(0))
     {
         //this will make sure tokens are in the reward pool
-        if ( address(rewardToken) == address(0) ) require(msg.value == reward, "Correct reward was not sent.");
-        else rewardToken.safeTransferFrom(msg.sender, address(this), reward);
+        if ( address(rewardToken) == address(0) ){
+            require(msg.value == reward, "Correct reward was not sent.");
+        }
+        else {
+            require(msg.value == 0, "Do not send ETH");
+            rewardToken.safeTransferFrom(msg.sender, address(this), reward);
+        }
         
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(DURATION);

@@ -27,7 +27,7 @@ describe("BalanceManager", function () {
     governanceStaker = await GovernanceStakerFactory.deploy(token.address, constants.AddressZero);
     balanceManager = await BalanceFactory.deploy();
     await balanceManager.initialize(planManager.address, governanceStaker.address, rewardManager.address, await dev.getAddress());
-    await rewardManager.initialize(token.address, await user.getAddress(), balanceManager.address);
+    await rewardManager.initialize(constants.AddressZero, await user.getAddress(), balanceManager.address);
   });
 
   describe("#initialize()", function() {

@@ -7,7 +7,7 @@ import '../general/TokenWrapper.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
-import '../interfaces/IRewardDistributionRecipient.sol';
+import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 
 /**
 * MIT License
@@ -33,7 +33,7 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract LPFarm is TokenWrapper, Ownable, IRewardDistributionRecipient {
+contract LPFarm is TokenWrapper, Ownable, IRewardDistributionRecipientTokenOnly {
     IERC20 public rewardToken;
     address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
@@ -68,6 +68,7 @@ contract LPFarm is TokenWrapper, Ownable, IRewardDistributionRecipient {
     constructor(address _stakeToken, address _rewardToken)
       public
     {
+        Ownable.initialize();
         stakeToken = IERC20(_stakeToken);
         rewardToken = IERC20(_rewardToken);
     }
@@ -135,11 +136,11 @@ contract LPFarm is TokenWrapper, Ownable, IRewardDistributionRecipient {
 
     function notifyRewardAmount(uint256 reward)
         external
-        payable
         override
         onlyRewardDistribution
         updateReward(address(0))
     {
+        rewardToken.safeTransferFrom(msg.sender, address(this), reward);
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(DURATION);
         } else {
