@@ -3,6 +3,7 @@
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
+import '../general/NFTStorage.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
@@ -11,10 +12,11 @@ import '../interfaces/IRewardManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
 import '../interfaces/IStakeManager.sol';
+
 /**
  * @dev Encompasses all functions taken by stakers.
 **/
-contract StakeManager is Ownable, IStakeManager {
+contract StakeManager is Ownable, NFTStorage, IStakeManager {
     
     using SafeMath for uint;
     
@@ -53,7 +55,9 @@ contract StakeManager is Ownable, IStakeManager {
     event StakedNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
 
     // Event launched when an NFT expires.
-    event ExpiredNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
+    event RemovedNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
+
+    event ExpiredNFT(address indexed user, uint256 nftId);
     
     // Event launched when an NFT expires.
     event WithdrawNFT(address indexed user, uint256 nftId);
@@ -100,7 +104,7 @@ contract StakeManager is Ownable, IStakeManager {
             _stake(_nftIds[i], msg.sender);
         }
     }
-
+    
     /**
      * @dev removeExpiredNft is called on many different interactions to the system overall.
      * @param _nftId The ID of the expired NFT.
@@ -108,13 +112,24 @@ contract StakeManager is Ownable, IStakeManager {
     function removeExpiredNft(uint256 _nftId)
       public
     {
-        (/*coverId*/, uint8 status, uint256 sumAssured, uint16 coverPeriod, /*valid until*/, address scAddress, 
-         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = arNFT.getToken(_nftId);
-        
+        (/*coverId*/, uint8 status, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, /*valid until*/, /*address scAddress*/, 
+         /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
+        address user = nftOwners[_nftId];
         _checkNftExpired(status);
-        
+        _removeNft(_nftId);
+        emit ExpiredNFT(user, _nftId);
+    }
+
+    function _removeNft(uint256 _nftId)
+      internal
+    {
+        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, uint256 validuntil, address scAddress, 
+         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = arNFT.getToken(_nftId);
         address user = nftOwners[_nftId];
         require(user != address(0), "NFT does not belong here.");
+
+        pop(_nftId, uint96(validuntil));
+        //TODO add functionality to remove by nft id in nftstorage
         
         uint256 weiSumAssured = sumAssured * (10 ** 18);
         uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
@@ -122,8 +137,6 @@ contract StakeManager is Ownable, IStakeManager {
         
         // Returns the caller some gas as well as ensure this function cannot be called again.
         delete nftOwners[_nftId];
-        
-        emit ExpiredNFT(user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
     }
 
     /**
@@ -146,7 +159,7 @@ contract StakeManager is Ownable, IStakeManager {
             return;
         }
         
-        removeExpiredNft(_nftId);
+        _removeNft(_nftId);
         claimManager.transferNft(msg.sender, _nftId);
     }
 
@@ -203,6 +216,7 @@ contract StakeManager is Ownable, IStakeManager {
         
         arNFT.transferFrom(_user, address(claimManager), _nftId);
 
+        push(uint128(_nftId), _user, uint96(validUntil));
         // Save owner of NFT.
         nftOwners[_nftId] = _user;
 

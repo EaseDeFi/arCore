@@ -59,18 +59,27 @@ describe("ClaimManager", function () {
         ethers.utils.randomBytes(32),
         ethers.utils.randomBytes(32)
       );
-      await arNFT.connect(user).approve(stakeManager.address, 0);
-      await stakeManager.connect(user).stakeNft(0);
+      await arNFT.connect(user).buyCover(
+        arNFT.address,
+        "0x45544800",
+        [100, 10, 1000, 10000000, 1],
+        100,
+        0,
+        ethers.utils.randomBytes(32),
+        ethers.utils.randomBytes(32)
+      );
+      await arNFT.connect(user).approve(stakeManager.address, 1);
+      await stakeManager.connect(user).stakeNft(1);
       await increase(100);
       now = await getTimestamp();
       await claimManager.connect(owner).confirmHack(arNFT.address, now.sub(1).toString());
     });
 
     it('should fail if hack is not confirmed yet', async function(){
-      await expect(claimManager.connect(user).submitNft(0, now.sub(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
+      await expect(claimManager.connect(user).submitNft(1, now.sub(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
     });
     it('should success', async function(){
-      await claimManager.connect(user).submitNft(0, now.sub(1).toString());
+      await claimManager.connect(user).submitNft(1, now.sub(1).toString());
     });
   });
 
