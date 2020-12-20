@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/Keeper.sol';
+import '../general/ArmorModule.sol';
 import '../libraries/MerkleProof.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
@@ -10,9 +10,9 @@ import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
 
 /**
- * @dev Separating this off to specifically keep track of a borrower's plans.
+ * @dev Separating this off to specifically doKeep track of a borrower's plans.
 **/
-contract PlanManager is Keeper, IPlanManager {
+contract PlanManager is ArmorModule, IPlanManager {
     
     // List of plans that a user has purchased so there is a historical record.
     mapping (address => Plan[]) public plans;
@@ -21,7 +21,7 @@ contract PlanManager is Keeper, IPlanManager {
     // Cover price in ETH (1e18) of price per second per DAI covered.
     mapping (address => uint256) public nftCoverPrice;
     
-    // Mapping to keep track of how much coverage we've sold for each protocol.
+    // Mapping to doKeep track of how much coverage we've sold for each protocol.
     // smart contract address => total borrowed cover
     mapping (address => uint256) public totalBorrowedAmount;
 
@@ -37,37 +37,12 @@ contract PlanManager is Keeper, IPlanManager {
         bytes32 merkleRoot;
         mapping(address => bool) claimed;
     }
-
-    IStakeManager public stakeManager;
-    IBalanceManager public balanceManager;
-    IClaimManager public claimManager;
     
     function initialize(
-        address _stakeManager,
-        address _balanceManager,
-        address _claimManager
+        address _armorMaster
     ) external override {
-        require(stakeManager == IStakeManager(address(0)), "Contract already initialized.");
-        initializeKeeper(_stakeManager);
-        stakeManager = IStakeManager(_stakeManager);
-        balanceManager = IBalanceManager(_balanceManager);
-        claimManager = IClaimManager(_claimManager);
+        initializeModule(_armorMaster);
         markup = 2;
-    }
-
-    modifier onlyStakeManager() {
-        require(msg.sender == address(stakeManager), "Only StakeManager can call this function");
-        _;
-    }
-
-    modifier onlyBalanceManager() {
-        require(msg.sender == address(balanceManager), "Only BalanceManager can call this function");
-        _;
-    }
-    
-    modifier onlyClaimManager() {
-        require(msg.sender == address(claimManager), "Only ClaimManager can call this function");
-        _;
     }
 
     function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end,  bytes32 root){
@@ -94,7 +69,7 @@ contract PlanManager is Keeper, IPlanManager {
     **/
     function updatePlan(address[] calldata _oldProtocols, uint256[] calldata _oldCoverAmounts, address[] calldata _protocols, uint256[] calldata _coverAmounts)
       external
-      keep
+      doKeep
       override
     {
         // Need to get price of the protocol here
@@ -131,7 +106,7 @@ contract PlanManager is Keeper, IPlanManager {
 
         newPricePerSec = newPricePerSec * _markup / (10**18);
 
-        uint256 balance = balanceManager.balanceOf(msg.sender);
+        uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;
         
         //require(_protocols.length == _coverAmounts.length, "Input array lengths do not match.");
@@ -141,7 +116,7 @@ contract PlanManager is Keeper, IPlanManager {
         plans[msg.sender].push(newPlan);
         
         // update balance price per second here
-        balanceManager.changePrice(msg.sender, newPricePerSec);
+        IBalanceManager(getModule("BALANCE")).changePrice(msg.sender, newPricePerSec);
 
         emit PlanUpdate(msg.sender, _protocols, _coverAmounts, endTime);
     }
@@ -176,7 +151,7 @@ contract PlanManager is Keeper, IPlanManager {
         for (uint256 i = 0; i < _newProtocols.length; i++) {
             totalUsedCover[_newProtocols[i]] += _newCoverAmounts[i];
             // Check StakeManager to ensure the new total amount does not go above the staked amount.
-            require(stakeManager.allowedCover(_newProtocols[i], totalUsedCover[_newProtocols[i]]), "Exceeds total cover amount");
+            require(IStakeManager(getModule("STAKE")).allowedCover(_newProtocols[i], totalUsedCover[_newProtocols[i]]), "Exceeds total cover amount");
         }
     }
     
@@ -210,7 +185,7 @@ contract PlanManager is Keeper, IPlanManager {
         return (uint256(-1), false);
     }
 
-    function planRedeemed(address _user, uint256 _planIndex, address _protocol) external override onlyClaimManager{
+    function planRedeemed(address _user, uint256 _planIndex, address _protocol) external override onlyModule("CLAIM"){
         Plan storage plan = plans[_user][_planIndex];
         require(plan.endTime < now, "Cannot redeem active plan, update plan to redeem properly");
         plan.claimed[_protocol] = true;
@@ -224,7 +199,7 @@ contract PlanManager is Keeper, IPlanManager {
     function changePrice(address _protocol, uint256 _newPrice)
       external
       override
-      onlyStakeManager
+      onlyModule("STAKE")
     {
         nftCoverPrice[_protocol] = _newPrice;
     }
@@ -232,12 +207,12 @@ contract PlanManager is Keeper, IPlanManager {
     function updateExpireTime(address _user)
       external
       override
-      onlyBalanceManager
+      onlyModule("BALANCE")
     {
         if (plans[_user].length == 0) return;
         Plan storage plan = plans[_user][plans[_user].length-1];
-        uint256 balance = balanceManager.balanceOf(_user);
-        uint256 pricePerSec = balanceManager.perSecondPrice(_user);
+        uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(_user);
+        uint256 pricePerSec = IBalanceManager(getModule("BALANCE")).perSecondPrice(_user);
         
         if(plan.endTime >= now){
             plan.endTime = uint128(balance / pricePerSec + now);

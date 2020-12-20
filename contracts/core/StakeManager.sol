@@ -64,7 +64,7 @@ contract StakeManager is ArmorModule, NFTStorage, IStakeManager {
         withdrawalDelay = 0;
     }
 
-    function keep() public {
+    function keep() external {
         while(infos[head].expiresAt !=0 && infos[head].expiresAt <= now){
             _removeExpiredNft(head);
         }
