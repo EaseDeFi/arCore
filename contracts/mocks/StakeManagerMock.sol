@@ -8,6 +8,8 @@ contract StakeManagerMock {
 
     address planManager;
 
+    event Keep();
+
     function allowedCover(address _protocol, uint256 _total) external view returns (bool) {
         return limit[_protocol] >= _total;
     }
@@ -22,5 +24,9 @@ contract StakeManagerMock {
 
     function mockSetPlanManagerPrice(address _protocol, uint256 _newPrice) external {
         IPlanManager(planManager).changePrice(_protocol, _newPrice);
+    }
+
+    function keep() external {
+        emit Keep();
     }
 }

@@ -80,6 +80,22 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
         // Let's be explicit. Testnet will have 0 to easily adjust stakers.
         withdrawalDelay = 0;
     }
+
+    modifier internalKeep() {
+        keep();
+        _;
+    }
+
+    modifier onlyClaimManager() {
+        require(msg.sender == address(claimManager), "Sender must be ClaimManager.");
+        _;
+    }
+
+    function keep() public {
+        while(infos[head].expiresAt !=0 && infos[head].expiresAt <= now){
+            _removeExpiredNft(head);
+        }
+    }
     
     /**
      * @dev stakeNft allows a user to submit their NFT to the contract and begin getting returns.
@@ -88,6 +104,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function stakeNft(uint256 _nftId)
       public
+      internalKeep
     {
         _stake(_nftId, msg.sender);
     }
@@ -98,6 +115,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function batchStakeNft(uint256[] memory _nftIds)
       public
+      internalKeep
     {
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
@@ -109,13 +127,14 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
      * @dev removeExpiredNft is called on many different interactions to the system overall.
      * @param _nftId The ID of the expired NFT.
     **/
-    function removeExpiredNft(uint256 _nftId)
-      public
+    function _removeExpiredNft(uint256 _nftId)
+      internal
     {
         (/*coverId*/, uint8 status, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, /*valid until*/, /*address scAddress*/, 
          /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
         address user = nftOwners[_nftId];
-        _checkNftExpired(status);
+        // changed to get status instead of validUntil
+        // require(status == uint8(3), "NFT is not expired.");
         _removeNft(_nftId);
         emit ExpiredNFT(user, _nftId);
     }
@@ -128,7 +147,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
         address user = nftOwners[_nftId];
         require(user != address(0), "NFT does not belong here.");
 
-        pop(_nftId, uint96(validuntil));
+        pop(_nftId, uint64(validuntil));
         //TODO add functionality to remove by nft id in nftstorage
         
         uint256 weiSumAssured = sumAssured * (10 ** 18);
@@ -144,7 +163,8 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
      * @param _nftId ID of the NFT to withdraw.
     **/
     function withdrawNft(uint256 _nftId)
-      public
+      external
+      internalKeep
     {
         require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
         
@@ -171,8 +191,8 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     function subtractTotal(uint256 _nftId, address _protocol, uint256 _subtractAmount)
       external
       override
+      onlyClaimManager
     {
-        require(msg.sender == address(claimManager), "Sender must be ClaimManager.");
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_subtractAmount);
         submitted[_nftId] = true;
     }
@@ -184,7 +204,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
      * returns Whether or not this new total borrowed amount would be able to be covered.
     **/
     function allowedCover(address _protocol, uint256 _totalBorrowedAmount)
-      public
+      external
       override
       view
     returns (bool)
@@ -216,7 +236,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
         
         arNFT.transferFrom(_user, address(claimManager), _nftId);
 
-        push(uint128(_nftId), _user, uint96(validUntil));
+        push(uint96(_nftId), uint64(validUntil));
         // Save owner of NFT.
         nftOwners[_nftId] = _user;
 
@@ -273,24 +293,13 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     }
     
     /**
-     * @dev Check if an NFT is owned on here and has expired.
-     * @param _coverStatus Unix time that the NFT expires.
-    **/
-    function _checkNftExpired(uint8 _coverStatus)
-      internal
-      pure
-    {
-        // changed to get status instead of validUntil
-        require(_coverStatus == 3, "NFT is not expired.");
-    }
-    
-    /**
      * @dev Allow the owner (DAO soon) to allow or disallow a protocol from being used in Armor.
      * @param _protocol The address of the protocol to allow or disallow.
      * @param _allow Whether to allow or disallow the protocol.
     **/
     function allowProtocol(address _protocol, bool _allow)
       external
+      internalKeep
       onlyOwner
     {
         allowedProtocols[_protocol] = _allow;    
@@ -302,6 +311,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function changeWithdrawalDelay(uint256 _withdrawalDelay)
       external
+      internalKeep
       onlyOwner
     {
         withdrawalDelay = _withdrawalDelay;
