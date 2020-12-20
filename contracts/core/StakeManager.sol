@@ -4,6 +4,7 @@ pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
 import '../general/NFTStorage.sol';
+import '../general/ArmorModule.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
@@ -16,22 +17,11 @@ import '../interfaces/IStakeManager.sol';
 /**
  * @dev Encompasses all functions taken by stakers.
 **/
-contract StakeManager is Ownable, NFTStorage, IStakeManager {
+contract StakeManager is ArmorModule, NFTStorage, IStakeManager {
     
     using SafeMath for uint;
     
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
-
-    // external contract addresses
-    IarNFT public arNFT;
-
-    // internal contract addresses 
-    IRewardManager public rewardManager;
-    
-    IPlanManager public planManager;
-    
-    // All NFTs will be immediately sent to the claim manager.
-    IClaimManager public claimManager;
     
     // Amount of time--in seconds--a user must wait to withdraw an NFT.
     uint256 withdrawalDelay;
@@ -64,31 +54,14 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     
     /**
      * @dev Construct the contract with the yNft contract.
-     * @param _nftContract Address of the yNft contract.
     **/
-    function initialize(address _nftContract, address _rewardManager, address _planManager, address _claimManager)
+    function initialize(address _armorMaster)
       public
       override
     {
-        require(address(arNFT) == address(0), "Contract already initialized.");
-        Ownable.initialize();
-        arNFT = IarNFT(_nftContract);
-        rewardManager = IRewardManager(_rewardManager);
-        planManager = IPlanManager(_planManager);
-        claimManager = IClaimManager(_claimManager);
-        
+        initializeModule(_armorMaster);
         // Let's be explicit. Testnet will have 0 to easily adjust stakers.
         withdrawalDelay = 0;
-    }
-
-    modifier internalKeep() {
-        keep();
-        _;
-    }
-
-    modifier onlyClaimManager() {
-        require(msg.sender == address(claimManager), "Sender must be ClaimManager.");
-        _;
     }
 
     function keep() public {
@@ -104,7 +77,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function stakeNft(uint256 _nftId)
       public
-      internalKeep
+      doKeep
     {
         _stake(_nftId, msg.sender);
     }
@@ -115,7 +88,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function batchStakeNft(uint256[] memory _nftIds)
       public
-      internalKeep
+      doKeep
     {
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
@@ -131,7 +104,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
       internal
     {
         (/*coverId*/, uint8 status, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, /*valid until*/, /*address scAddress*/, 
-         /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
+         /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
         address user = nftOwners[_nftId];
         // changed to get status instead of validUntil
         // require(status == uint8(3), "NFT is not expired.");
@@ -143,7 +116,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
       internal
     {
         (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, uint256 validuntil, address scAddress, 
-         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = arNFT.getToken(_nftId);
+         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
         address user = nftOwners[_nftId];
         require(user != address(0), "NFT does not belong here.");
 
@@ -164,7 +137,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function withdrawNft(uint256 _nftId)
       external
-      internalKeep
+      doKeep
     {
         require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
         
@@ -180,7 +153,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
         }
         
         _removeNft(_nftId);
-        claimManager.transferNft(msg.sender, _nftId);
+        IClaimManager(getModule("CLAIM")).transferNft(msg.sender, _nftId);
     }
 
     /**
@@ -191,7 +164,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     function subtractTotal(uint256 _nftId, address _protocol, uint256 _subtractAmount)
       external
       override
-      onlyClaimManager
+      onlyModule("CLAIM")
     {
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_subtractAmount);
         submitted[_nftId] = true;
@@ -221,7 +194,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
       internal
     {
         (/*coverId*/,  uint8 coverStatus, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress, 
-         bytes4 coverCurrency, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = arNFT.getToken(_nftId);
+         bytes4 coverCurrency, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
         
         _checkNftValid(validUntil, scAddress, coverCurrency, coverStatus);
         
@@ -232,9 +205,9 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
         // Find price per amount here to update plan manager correctly.
         uint256 pricePerEth = secondPrice / sumAssured;
         
-        planManager.changePrice(scAddress, pricePerEth);
+        IPlanManager(getModule("PLAN")).changePrice(scAddress, pricePerEth);
         
-        arNFT.transferFrom(_user, address(claimManager), _nftId);
+        IarNFT(getModule("ARNFT")).transferFrom(_user, getModule("CLAIM"), _nftId);
 
         push(uint96(_nftId), uint64(validUntil));
         // Save owner of NFT.
@@ -255,7 +228,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     function _addCovers(address _user, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        rewardManager.stake(_user, _coverPrice);
+        IRewardManager(getModule("REWARD")).stake(_user, _coverPrice);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
     }
     
@@ -270,7 +243,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     function _subtractCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        rewardManager.withdraw(_user, _coverPrice);
+        IRewardManager(getModule("REWARD")).withdraw(_user, _coverPrice);
         if (!submitted[_nftId]) totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     
@@ -299,7 +272,7 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function allowProtocol(address _protocol, bool _allow)
       external
-      internalKeep
+      doKeep
       onlyOwner
     {
         allowedProtocols[_protocol] = _allow;    
@@ -311,10 +284,9 @@ contract StakeManager is Ownable, NFTStorage, IStakeManager {
     **/
     function changeWithdrawalDelay(uint256 _withdrawalDelay)
       external
-      internalKeep
+      doKeep
       onlyOwner
     {
         withdrawalDelay = _withdrawalDelay;
     }
-    
 }

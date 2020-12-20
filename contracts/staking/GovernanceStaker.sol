@@ -68,7 +68,6 @@ contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient
     constructor(address _stakeToken, address _rewardToken)
       public
     {
-        Ownable.initialize();
         stakeToken = IERC20(_stakeToken);
         rewardToken = IERC20(_rewardToken);
     }

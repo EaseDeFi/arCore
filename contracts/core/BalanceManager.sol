@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/Ownable.sol';
+import '../general/ArmorModule.sol';
 import '../general/Keeper.sol';
 import '../staking/GovernanceStaker.sol';
 import '../libraries/SafeMath.sol';
@@ -15,13 +15,9 @@ import '../interfaces/IRewardManager.sol';
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
  **/
-contract BalanceManager is Ownable, Keeper, IBalanceManager {
+contract BalanceManager is ArmorModule, IBalanceManager {
 
     using SafeMath for uint;
-
-    IPlanManager public planManager;
-
-    IRewardManager public rewardManager;
 
     GovernanceStaker public governanceStaker;
     
@@ -65,21 +61,13 @@ contract BalanceManager is Ownable, Keeper, IBalanceManager {
     }
 
     /**
-     * @param _planManager Address of the PlanManager contract.
+     * @param _armorMaster Address of the ArmorMaster contract.
      **/
-    function initialize(address _planManager, address _governanceStaker, address _rewardManager, address _stakeManager, address _devWallet)
+    function initialize(address _armorMaster, address _devWallet)
       external
       override
     {
-        require(_planManager != address(0), "plan manager cannot be zero address");
-        require(_governanceStaker != address(0), "governance staker cannot be zero address");
-        require(_rewardManager != address(0), "reward manager cannot be zero address");
-        require(address(planManager) == address(0), "Contract already initialized.");
-        Ownable.initialize();
-        planManager = IPlanManager(_planManager);
-        governanceStaker = GovernanceStaker(_governanceStaker);
-        rewardManager = IRewardManager(_rewardManager);
-        initializeKeeper(_stakeManager);
+        initializeModule(_armorMaster);
         devWallet = _devWallet;
         devPercent = 0;     // 0 %
         refPercent = 25;    // 2.5%
@@ -95,7 +83,7 @@ contract BalanceManager is Ownable, Keeper, IBalanceManager {
     payable
     override
     update(msg.sender)
-    keep
+    doKeep
     {
         if ( referrers[msg.sender] == address(0) ) {
             referrers[msg.sender] = _referrer != address(0) ? _referrer : devWallet;
@@ -116,10 +104,9 @@ contract BalanceManager is Ownable, Keeper, IBalanceManager {
      **/
     function withdraw(uint256 _amount)
     external
-    keep
+    doKeep
     override
     update(msg.sender)
-    keep
     {
         Balance memory balance = balances[msg.sender];
         // this can be achieved by safeMath.sub
@@ -204,7 +191,7 @@ contract BalanceManager is Ownable, Keeper, IBalanceManager {
     override
     update(_user)
     {
-        require(msg.sender == address(planManager), "Caller is not PlanManager.");
+        require(msg.sender == getModule("PLAN"), "Caller is not PlanManager.");
         balances[_user].perSecondPrice = _newPrice;
         emit PriceChange(_user, _newPrice);
     }
@@ -218,11 +205,11 @@ contract BalanceManager is Ownable, Keeper, IBalanceManager {
        uint256 govBalance = balances[address(governanceStaker)].lastBalance;
        balances[address(governanceStaker)].lastBalance = 0;
        
-       uint256 rewardBalance = balances[address(rewardManager)].lastBalance;
-       balances[address(rewardManager)].lastBalance = 0;
-       
+       uint256 rewardBalance = balances[getModule("REWARD")].lastBalance;
+       balances[getModule("REWARD")].lastBalance = 0;
+
        governanceStaker.notifyRewardAmount{value: govBalance}(govBalance);
-       rewardManager.notifyRewardAmount{value: rewardBalance}(rewardBalance);
+       IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
     }
 
     function perSecondPrice(address _user)
@@ -255,13 +242,13 @@ contract BalanceManager is Ownable, Keeper, IBalanceManager {
         }
         if (devAmount > 0) balances[devWallet].lastBalance = balances[devWallet].lastBalance.add(devAmount);
         if (govAmount > 0) balances[address(governanceStaker)].lastBalance = balances[address(governanceStaker)].lastBalance.add(govAmount);
-        if (nftAmount > 0) balances[address(rewardManager)].lastBalance = balances[address(rewardManager)].lastBalance.add(nftAmount);
+        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount);
     }
 
     function _notifyBalanceChange(address _user) 
     internal
     {
-        planManager.updateExpireTime(_user); 
+        IPlanManager(getModule("PLAN")).updateExpireTime(_user); 
     }
     
     /**

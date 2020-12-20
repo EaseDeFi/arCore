@@ -68,7 +68,7 @@ contract LPFarm is TokenWrapper, Ownable, IRewardDistributionRecipientTokenOnly 
     constructor(address _stakeToken, address _rewardToken)
       public
     {
-        Ownable.initialize();
+        Ownable.initializeOwnable();
         stakeToken = IERC20(_stakeToken);
         rewardToken = IERC20(_rewardToken);
     }

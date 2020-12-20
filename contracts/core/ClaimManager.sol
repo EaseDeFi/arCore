@@ -2,8 +2,7 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/Ownable.sol';
-import '../general/Keeper.sol';
+import '../general/ArmorModule.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
@@ -14,14 +13,8 @@ import '../interfaces/IClaimManager.sol';
  * @dev This contract holds all NFTs. The only time it does something is if a user requests a claim.
  * @notice We need to make sure a user can only claim when they have balance.
 **/
-contract ClaimManager is Ownable, Keeper, IClaimManager {
+contract ClaimManager is ArmorModule, IClaimManager {
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
-
-    IPlanManager public planManager;
-
-    IarNFT public arNFT;
-
-    IStakeManager public stakeManager;
 
     // Mapping of hacks that we have confirmed to have happened. (keccak256(protocol ID, timestamp) => didithappen).
     mapping (bytes32 => bool) confirmedHacks;
@@ -32,29 +25,18 @@ contract ClaimManager is Ownable, Keeper, IClaimManager {
     // Emitted when a user successfully receives a payout.
     event ClaimPayout(bytes32 indexed hackId, address indexed user, uint256 amount);
 
-    modifier onlyStakeManager() {
-        require(msg.sender == address(stakeManager), "only stake manager can call this function");
-        _;
-    }
     // for receiving redeemed ether
     receive() external payable {
     }
     
     /**
      * @dev Start the contract off by giving it the address of Nexus Mutual to submit a claim.
-     * @dev _planManager Address of the PlanManager Armor contract.
-     * @dev __arNFT Address of the arNFT contract.
     **/
-    function initialize(address _planManager, address _stakeManager, address _arNFT)
+    function initialize(address _armorMaster)
       public
       override
     {
-        Ownable.initialize();
-        require(planManager == IPlanManager( address(0) ), "Contract already initialized.");
-        planManager = IPlanManager(_planManager);
-        initializeKeeper(_stakeManager);
-        arNFT = IarNFT(_arNFT);
-        stakeManager = IStakeManager(_stakeManager);
+        initializeModule(_armorMaster);
     }
     
     /**
@@ -66,19 +48,19 @@ contract ClaimManager is Ownable, Keeper, IClaimManager {
     **/
     function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount, bytes32[] calldata _path)
       external
-      keep
+      doKeep
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
         
         // Gets the coverage amount of the user at the time the hack happened.
         // TODO check if plan is not active now => to prevent users paying more than needed
-        (uint256 planIndex, bool covered) = planManager.checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path);
+        (uint256 planIndex, bool covered) = IPlanManager(getModule("PLAN")).checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path);
         require(covered, "User does not have valid amount, check path and amount");
         
         // Put Ether into 18 decimal format.
         uint256 payment = _amount * 10 ** 18;
-        planManager.planRedeemed(msg.sender, planIndex, _protocol);
+        IPlanManager(getModule("PLAN")).planRedeemed(msg.sender, planIndex, _protocol);
         msg.sender.transfer(payment);
         
         emit ClaimPayout(hackId, msg.sender, _amount);
@@ -91,10 +73,10 @@ contract ClaimManager is Ownable, Keeper, IClaimManager {
     **/
     function submitNft(uint256 _nftId,uint256 _hackTime)
       external
-      keep
+      doKeep
     {
         (/*cid*/, uint8 status, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress,
-        bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
+        bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
         bytes32 hackId = keccak256(abi.encodePacked(scAddress, _hackTime));
         
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
@@ -109,9 +91,9 @@ contract ClaimManager is Ownable, Keeper, IClaimManager {
 
         // Subtract amount it was protecting from total staked for the protocol if it is not expired (in which case it already has been subtracted).
         uint256 weiSumAssured = sumAssured * (10 ** 18);
-        if (status != 3) stakeManager.subtractTotal(_nftId, scAddress, weiSumAssured);
+        if (status != 3) IStakeManager(getModule("STAKE")).subtractTotal(_nftId, scAddress, weiSumAssured);
 
-        arNFT.submitClaim(_nftId);
+        IarNFT(getModule("ARNFT")).submitClaim(_nftId);
     }
     
     /**
@@ -121,10 +103,10 @@ contract ClaimManager is Ownable, Keeper, IClaimManager {
     **/
     function redeemNft(uint256 _nftId)
       external
-      keep
+      doKeep
     {
         //TODO: decrease total covered amount
-        arNFT.redeemClaim(_nftId);
+        IarNFT(getModule("ARNFT")).redeemClaim(_nftId);
     }
     
     /**
@@ -135,9 +117,9 @@ contract ClaimManager is Ownable, Keeper, IClaimManager {
     function transferNft(address _to, uint256 _nftId)
       external
       override
-      onlyStakeManager
+      onlyModule("STAKE")
     {
-        arNFT.safeTransferFrom(address(this), _to, _nftId);
+        IarNFT(getModule("ARNFT")).safeTransferFrom(address(this), _to, _nftId);
     }
     
     /**

@@ -18,9 +18,10 @@ contract Ownable {
      * @dev The Ownable constructor sets the original `owner` of the contract to the sender
      * account.
      */
-    function initialize() internal {
+    function initializeOwnable() internal {
+        require(_owner == address(0), "already initialized");
         _owner = msg.sender;
-        emit OwnershipTransferred(address(0), _owner);
+        emit OwnershipTransferred(address(0), msg.sender);
     }
 
 
@@ -75,5 +76,7 @@ contract Ownable {
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
     }
+
+    uint256[50] private __gap;
 }
 
