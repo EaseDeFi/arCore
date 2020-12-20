@@ -49,4 +49,8 @@ contract ArmorMaster is Ownable, IArmorMaster {
             IKeeperRecipient(_modules[_jobs[i]]).keep();
         }
     }
+
+    function jobs() external view returns(bytes32[] memory) {
+        return _jobs;
+    }
 }
