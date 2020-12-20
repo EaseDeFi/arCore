@@ -3,6 +3,7 @@
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
+import '../general/Keeper.sol';
 import '../staking/GovernanceStaker.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
@@ -14,7 +15,7 @@ import '../interfaces/IRewardManager.sol';
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
  **/
-contract BalanceManager is Ownable, IBalanceManager {
+contract BalanceManager is Ownable, Keeper, IBalanceManager {
 
     using SafeMath for uint;
 
@@ -63,11 +64,10 @@ contract BalanceManager is Ownable, IBalanceManager {
         _;
     }
 
-
     /**
      * @param _planManager Address of the PlanManager contract.
      **/
-    function initialize(address _planManager, address _governanceStaker, address _rewardManager, address _devWallet)
+    function initialize(address _planManager, address _governanceStaker, address _rewardManager, address _stakeManager, address _devWallet)
       external
       override
     {
@@ -79,6 +79,7 @@ contract BalanceManager is Ownable, IBalanceManager {
         planManager = IPlanManager(_planManager);
         governanceStaker = GovernanceStaker(_governanceStaker);
         rewardManager = IRewardManager(_rewardManager);
+        initializeKeeper(_stakeManager);
         devWallet = _devWallet;
         devPercent = 0;     // 0 %
         refPercent = 25;    // 2.5%
@@ -94,6 +95,7 @@ contract BalanceManager is Ownable, IBalanceManager {
     payable
     override
     update(msg.sender)
+    keep
     {
         if ( referrers[msg.sender] == address(0) ) {
             referrers[msg.sender] = _referrer != address(0) ? _referrer : devWallet;
@@ -114,8 +116,10 @@ contract BalanceManager is Ownable, IBalanceManager {
      **/
     function withdraw(uint256 _amount)
     external
+    keep
     override
     update(msg.sender)
+    keep
     {
         Balance memory balance = balances[msg.sender];
         // this can be achieved by safeMath.sub
@@ -133,7 +137,7 @@ contract BalanceManager is Ownable, IBalanceManager {
     /**
      * @dev Find the current balance of a user to the second.
      * @param _user The user whose balance to find.
-    **/
+     **/
     function balanceOf(address _user)
     public
     view
@@ -157,9 +161,9 @@ contract BalanceManager is Ownable, IBalanceManager {
     }
 
     /**
-    * @dev Update a borrower's balance to it's adjusted amount.
-    * @param _user The address to be updated.
-        **/
+     * @dev Update a borrower's balance to it's adjusted amount.
+     * @param _user The address to be updated.
+     **/
     function updateBalance(address _user)
     public
     override
@@ -292,5 +296,4 @@ contract BalanceManager is Ownable, IBalanceManager {
         require(_newPercent <= DENOMINATOR, "new percent cannot be bigger than DENOMINATOR");
         devPercent = _newPercent;
     }
-    
 }

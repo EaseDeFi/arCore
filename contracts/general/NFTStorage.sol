@@ -8,31 +8,30 @@ import "hardhat/console.sol";
 **/
 contract NFTStorage {
     // 1 day for each step.
-    uint96 public constant BUCKET_STEP = 86400;
+    uint64 public constant BUCKET_STEP = 86400;
 
     // indicates where to start from 
     // points where TokenInfo with (expiredAt / BUCKET_STEP) == index
-    mapping(uint96 => Bucket) public checkPoints;
+    mapping(uint64 => Bucket) public checkPoints;
 
     struct Bucket {
-        uint128 head;
-        uint128 tail;
+        uint96 head;
+        uint96 tail;
     }
 
     // points first active nft
-    uint128 public head;
+    uint96 public head;
     // points last active nft
-    uint128 public tail;
+    uint96 public tail;
 
     // maps nftId to deposit info
-    mapping(uint128 => DepositInfo) public infos; 
+    mapping(uint96 => DepositInfo) public infos; 
     
     // pack data to reduce gas
     struct DepositInfo {
-        uint128 next; // zero if there is no further information
-        uint128 prev;
-        address owner;
-        uint96 expiresAt;
+        uint96 next; // zero if there is no further information
+        uint96 prev;
+        uint64 expiresAt;
     }
 
     function expired() internal returns(bool){
@@ -40,7 +39,7 @@ contract NFTStorage {
             return false;
         }
 
-        if(infos[head].expiresAt <= uint96(now)){
+        if(infos[head].expiresAt <= uint64(now)){
             return true;
         }
 
@@ -51,18 +50,18 @@ contract NFTStorage {
      * @notice Let's add SafeMath to this
     **/
     // using typecasted nftId to save gas
-    function push(uint128 nftId, address user, uint96 expiresAt) 
+    function push(uint96 nftId, uint64 expiresAt) 
       internal 
     {
         require(nftId != 0, "nft id 0 cannot be supported");
-        uint96 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
+        uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
         console.logUint(bucket);        
         if (head == 0) {
             // all the nfts are expired. so just add
             head = nftId;
             tail = nftId; 
             checkPoints[bucket] = Bucket(nftId, nftId);
-            infos[nftId] = DepositInfo(0,0,user,expiresAt);
+            infos[nftId] = DepositInfo(0,0,expiresAt);
             
             return;
         }
@@ -72,7 +71,7 @@ contract NFTStorage {
         if (infos[head].expiresAt >= expiresAt) {
             // pushing nft is going to expire first
             // update head
-            infos[nftId] = DepositInfo(0,head,user,expiresAt);
+            infos[nftId] = DepositInfo(0,head,expiresAt);
             head = nftId;
             
             // update head of bucket
@@ -91,7 +90,7 @@ contract NFTStorage {
         // then check if depositing nft will last more than latest
         if (infos[tail].expiresAt <= expiresAt) {
             // push nft at tail
-            infos[nftId] = DepositInfo(tail,0,user,expiresAt);
+            infos[nftId] = DepositInfo(tail,0,expiresAt);
             tail = nftId;
             
             // update tail of bucket
@@ -111,14 +110,14 @@ contract NFTStorage {
         if (checkPoints[bucket].head != 0) {
             //bucket is not empty
             //we just need to find our neighbor in the bucket
-            uint128 cursor = checkPoints[bucket].head;
+            uint96 cursor = checkPoints[bucket].head;
         
             // iterate until we find our nft's next
             while(infos[cursor].expiresAt < expiresAt){
                 cursor = infos[cursor].next;
             }
         
-            infos[nftId] = DepositInfo(cursor, infos[cursor].prev, user, expiresAt);
+            infos[nftId] = DepositInfo(cursor, infos[cursor].prev, expiresAt);
             infos[infos[cursor].prev].next = nftId;
             infos[cursor].prev = nftId;
         
@@ -136,17 +135,17 @@ contract NFTStorage {
             //bucket is empty
             //should find which bucket has depositing nft's closest neighbor
             // step 1 find prev bucket
-            uint96 prevCursor = bucket - BUCKET_STEP;
+            uint64 prevCursor = bucket - BUCKET_STEP;
             
             while(checkPoints[prevCursor].tail != 0){
               prevCursor -= BUCKET_STEP;
             }
     
-            uint128 prev = checkPoints[prevCursor].tail;
-            uint128 next = infos[prev].next;
+            uint96 prev = checkPoints[prevCursor].tail;
+            uint96 next = infos[prev].next;
     
             // step 2 link prev buckets tail - nft - next buckets head
-            infos[nftId] = DepositInfo(next,prev,user,expiresAt);
+            infos[nftId] = DepositInfo(next,prev,expiresAt);
             infos[prev].next = nftId;
             infos[next].prev = nftId;
     
@@ -155,15 +154,15 @@ contract NFTStorage {
         }
     }
 
-    function pop(uint256 nftId, uint96 expiresAt) internal {
-        uint96 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
+    function pop(uint256 nftId, uint64 expiresAt) internal {
+        uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
         console.logUint(bucket);        
         // check if bucket is empty
         // if bucket is empty, reverts
         require(checkPoints[bucket].head != 0, "NFT does not exist:Bucket empty");
         // if bucket is not empty, iterate through
         // if expiresAt of current cursor is larger than expiresAt of parameter, reverts
-        for(uint128 cursor = checkPoints[bucket].head; infos[cursor].expiresAt <= expiresAt; cursor = infos[cursor].next) {
+        for(uint96 cursor = checkPoints[bucket].head; infos[cursor].expiresAt <= expiresAt; cursor = infos[cursor].next) {
             DepositInfo memory info = infos[cursor];
             // if expiresAt is same of paramter, check if nftId is same
             if(info.expiresAt == expiresAt && cursor == nftId) {

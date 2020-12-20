@@ -2,6 +2,7 @@
 
 pragma solidity ^0.6.6;
 
+import '../general/Keeper.sol';
 import '../general/Ownable.sol';
 import '../general/SafeERC20.sol';
 import '../general/BalanceWrapper.sol';
@@ -39,12 +40,12 @@ import '../interfaces/IRewardManager.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract RewardManager is BalanceWrapper, Ownable, IRewardManager{
+contract RewardManager is BalanceWrapper, Ownable, Keeper, IRewardManager{
     using SafeERC20 for IERC20;
 
     // Reward token is 0 if Ether is the reward.
     IERC20 public rewardToken;
-    address public stakeController;
+    address public stakeManager;
     address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
 
@@ -70,18 +71,24 @@ contract RewardManager is BalanceWrapper, Ownable, IRewardManager{
         _;
     }
 
+    modifier onlyStakeManager() {
+        require(msg.sender == stakeManager, "Caller is not the stake manager.");
+        _;
+    }
+
     modifier onlyRewardDistribution() {
         require(msg.sender == rewardDistribution, "Caller is not reward distribution");
         _;
     }
 
-    function initialize(address _rewardToken, address _stakeController, address _rewardDistribution)
+    function initialize(address _rewardToken, address _stakeManager, address _rewardDistribution)
       external
       override
     {
+        require(address(stakeManager) == address(0), "Contract is already initialized.");
         Ownable.initialize();
-        require(address(stakeController) == address(0), "Contract is already initialized.");
-        stakeController = _stakeController;
+        initializeKeeper(_stakeManager);
+        stakeManager = _stakeManager;
         rewardToken = IERC20(_rewardToken);
         rewardDistribution = _rewardDistribution;
     }
@@ -121,14 +128,12 @@ contract RewardManager is BalanceWrapper, Ownable, IRewardManager{
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address user, uint256 amount) external override updateReward(user) {
-        require(msg.sender == stakeController, "Caller is not the stake controller.");
+    function stake(address user, uint256 amount) external override onlyStakeManager updateReward(user) keep {
         _addStake(user, amount);
         emit BalanceAdded(user, amount);
     }
 
-    function withdraw(address user, uint256 amount) public override updateReward(user) {
-        require(msg.sender == stakeController, "Caller is not the stake controller.");
+    function withdraw(address user, uint256 amount) public override onlyStakeManager updateReward(user) keep {
         _removeStake(user, amount);
         emit BalanceWithdrawn(user, amount);
     }
@@ -138,7 +143,7 @@ contract RewardManager is BalanceWrapper, Ownable, IRewardManager{
         getReward(user);
     }
 
-    function getReward(address payable user) public override updateReward(user) {
+    function getReward(address payable user) public override updateReward(user) keep {
         uint256 reward = earned(user);
         if (reward > 0) {
             rewards[user] = 0;

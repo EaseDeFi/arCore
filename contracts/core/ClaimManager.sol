@@ -3,6 +3,7 @@
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
+import '../general/Keeper.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
@@ -13,7 +14,7 @@ import '../interfaces/IClaimManager.sol';
  * @dev This contract holds all NFTs. The only time it does something is if a user requests a claim.
  * @notice We need to make sure a user can only claim when they have balance.
 **/
-contract ClaimManager is Ownable, IClaimManager {
+contract ClaimManager is Ownable, Keeper, IClaimManager {
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
 
     IPlanManager public planManager;
@@ -51,6 +52,7 @@ contract ClaimManager is Ownable, IClaimManager {
         Ownable.initialize();
         require(planManager == IPlanManager( address(0) ), "Contract already initialized.");
         planManager = IPlanManager(_planManager);
+        initializeKeeper(_stakeManager);
         arNFT = IarNFT(_arNFT);
         stakeManager = IStakeManager(_stakeManager);
     }
@@ -64,6 +66,7 @@ contract ClaimManager is Ownable, IClaimManager {
     **/
     function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount, bytes32[] calldata _path)
       external
+      keep
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
@@ -88,6 +91,7 @@ contract ClaimManager is Ownable, IClaimManager {
     **/
     function submitNft(uint256 _nftId,uint256 _hackTime)
       external
+      keep
     {
         (/*cid*/, uint8 status, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress,
         bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = arNFT.getToken(_nftId);
@@ -117,6 +121,7 @@ contract ClaimManager is Ownable, IClaimManager {
     **/
     function redeemNft(uint256 _nftId)
       external
+      keep
     {
         //TODO: decrease total covered amount
         arNFT.redeemClaim(_nftId);

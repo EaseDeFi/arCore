@@ -2,6 +2,7 @@
 
 pragma solidity ^0.6.6;
 
+import '../general/Keeper.sol';
 import '../libraries/MerkleProof.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
@@ -11,7 +12,7 @@ import '../interfaces/IClaimManager.sol';
 /**
  * @dev Separating this off to specifically keep track of a borrower's plans.
 **/
-contract PlanManager is IPlanManager {
+contract PlanManager is Keeper, IPlanManager {
     
     // List of plans that a user has purchased so there is a historical record.
     mapping (address => Plan[]) public plans;
@@ -47,6 +48,7 @@ contract PlanManager is IPlanManager {
         address _claimManager
     ) external override {
         require(stakeManager == IStakeManager(address(0)), "Contract already initialized.");
+        initializeKeeper(_stakeManager);
         stakeManager = IStakeManager(_stakeManager);
         balanceManager = IBalanceManager(_balanceManager);
         claimManager = IClaimManager(_claimManager);
@@ -92,6 +94,7 @@ contract PlanManager is IPlanManager {
     **/
     function updatePlan(address[] calldata _oldProtocols, uint256[] calldata _oldCoverAmounts, address[] calldata _protocols, uint256[] calldata _coverAmounts)
       external
+      keep
       override
     {
         // Need to get price of the protocol here
