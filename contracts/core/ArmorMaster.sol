@@ -11,9 +11,8 @@ contract ArmorMaster is Ownable, IArmorMaster {
 
     bytes32[] internal _jobs;
 
-    function initialize() public {
+    function initialize() external {
         Ownable.initializeOwnable();
-        require(_modules[bytes32("MASTER")] == address(0), "already initialized");
         _modules[bytes32("MASTER")] = address(this);
     }
 
@@ -27,7 +26,7 @@ contract ArmorMaster is Ownable, IArmorMaster {
 
     function addJob(bytes32 _key) external onlyOwner {
         require(_jobs.length < 3, "cannot have more than 3 jobs");
-        require(_modules[_key] != address(0), "manager is not listed");
+        require(_modules[_key] != address(0), "module is not listed");
         for(uint256 i = 0; i< _jobs.length; i++){
             require(_jobs[i] != _key, "already registered");
         }
@@ -42,6 +41,7 @@ contract ArmorMaster is Ownable, IArmorMaster {
                 return;
             }
         }
+        revert("job not found");
     }
 
     function keep() external override {
