@@ -31,6 +31,7 @@ describe("StakeManager", function () {
     const StakeFactory = await ethers.getContractFactory("StakeManager");
     stakeManager = await StakeFactory.deploy();
     await stakeManager.connect(owner).initialize(master.address);
+    await master.connect(owner).registerModule(stringToBytes32("STAKE"), stakeManager.address);
     
     const PlanFactory = await ethers.getContractFactory("PlanManagerMock");
     planManager = await PlanFactory.deploy();
@@ -47,6 +48,9 @@ describe("StakeManager", function () {
     const arNFTFactory = await ethers.getContractFactory("arNFTMock");
     arNFT = await arNFTFactory.deploy();
     await master.connect(owner).registerModule(stringToBytes32("ARNFT"), arNFT.address);
+
+    // job
+    await master.connect(owner).addJob(stringToBytes32("STAKE"));
   });
 
   describe("#stakeNft()", function(){

@@ -61,10 +61,6 @@ describe("BalanceManager", function () {
     it('should fail if msg.value is zero', async function(){
       await expect(balanceManager.connect(user).deposit(await referrer.getAddress())).to.be.revertedWith("No Ether was deposited");
     });
-    it("should update balance", async function(){
-      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
-      expect('updateBalance').to.be.calledOnContract(balanceManager);
-    });
     it("should be able to deposit ether", async function (){
       await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
     });
@@ -85,10 +81,6 @@ describe("BalanceManager", function () {
     const amount = ethers.BigNumber.from("1000000");
     beforeEach(async function (){
       await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
-    });
-    it("should update balance", async function(){
-      await balanceManager.connect(user).withdraw(amount);
-      expect('updateBalance').to.be.calledOnContract(balanceManager);
     });
     it("should fail if amount is larger than balance", async function (){
       await expect(balanceManager.connect(user).withdraw(amount.add(1))).to.be.reverted;
