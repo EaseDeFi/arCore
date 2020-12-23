@@ -7,7 +7,7 @@ function stringToBytes32(str: string) : string {
   return ethers.utils.formatBytes32String(str);
 }
 
-describe.only("PlanManager", function () {
+describe("PlanManager", function () {
   let accounts: Signer[];
   let planManager: Contract;
   let master: Contract;

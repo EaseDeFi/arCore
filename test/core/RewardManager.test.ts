@@ -3,11 +3,16 @@ import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
 import { increase } from "../utils";
+
+function stringToBytes32(str: string) : string {
+  return ethers.utils.formatBytes32String(str);
+}
 describe("RewardManager", function () {
   let accounts: Signer[];
   let rewardManager: Contract;
   let stakeManager: Signer;
   let token: Contract;
+  let master: Contract;
 
   let user: Signer;
   let owner: Signer;
@@ -15,28 +20,36 @@ describe("RewardManager", function () {
   let amount = 1000000;
   let rewardAmount = amount * 100;
   beforeEach(async function () {
-    const RewardFactory = await ethers.getContractFactory("RewardManager");
-    const TokenFactory = await ethers.getContractFactory("ERC20Mock");
-    rewardManager = await RewardFactory.deploy();
-    
     accounts = await ethers.getSigners(); 
     user = accounts[4];
     owner = accounts[0];
-    stakeManager = accounts[1];
     rewardDistribution = accounts[2];
+    stakeManager = accounts[1];
+
+    const MasterFactory = await ethers.getContractFactory("ArmorMaster");
+    master = await MasterFactory.deploy();
+    await master.connect(owner).initialize();
+    
+    const TokenFactory = await ethers.getContractFactory("ERC20Mock");
     token = await TokenFactory.connect(owner).deploy();
-    await rewardManager.connect(owner).initialize(token.address, await stakeManager.getAddress(), await rewardDistribution.getAddress());
+    
+    const RewardFactory = await ethers.getContractFactory("RewardManager");
+    rewardManager = await RewardFactory.deploy();
+    await rewardManager.connect(owner).initialize(master.address, token.address, await rewardDistribution.getAddress());
+    await master.connect(owner).registerModule(stringToBytes32("REWARD"), rewardManager.address);
+
+    await master.connect(owner).registerModule(stringToBytes32("STAKE"), await stakeManager.getAddress());
   });
 
   describe('#initialize()', function(){
     it('should fail if already initialized', async function(){
-      await expect(rewardManager.connect(owner).initialize(token.address, await stakeManager.getAddress(), await rewardDistribution.getAddress())).to.be.revertedWith("Contract is already initialized.");
+      await expect(rewardManager.connect(owner).initialize(token.address, await stakeManager.getAddress(), await rewardDistribution.getAddress())).to.be.revertedWith("already initialized");
     });
   });
 
   describe('#setRewardDistribution()', function(){
     it('should fail if msg.sender is not owner', async function(){
-      await expect(rewardManager.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("msg.sender is not owner");
+      await expect(rewardManager.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("only owner can call this function");
     });
 
     it('should change reward distribution address', async function(){
@@ -83,7 +96,7 @@ describe("RewardManager", function () {
       await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
     });
     it('should fail if msg.sender is not stake manager', async function(){
-      await expect(rewardManager.connect(owner).stake(await user.getAddress(), amount)).to.be.revertedWith('Caller is not the stake controller');
+      await expect(rewardManager.connect(owner).stake(await user.getAddress(), amount)).to.be.revertedWith('only module STAKE can call this function');
     });
 
     it('should increase total supply', async function(){
@@ -108,7 +121,7 @@ describe("RewardManager", function () {
     });
 
     it('should fail if msg.sender is not stake manager', async function(){
-      await expect(rewardManager.connect(owner).withdraw(await user.getAddress(), amount)).to.be.revertedWith('Caller is not the stake controller');
+      await expect(rewardManager.connect(owner).withdraw(await user.getAddress(), amount)).to.be.revertedWith('only module STAKE can call this function');
     });
 
     it('should decrease total supply', async function(){
@@ -139,7 +152,7 @@ describe("RewardManager", function () {
     });
 
     it('should fail if msg.sender is not stake manager', async function(){
-      await expect(rewardManager.connect(owner).exit(await user.getAddress())).to.be.revertedWith('Caller is not the stake controller');
+      await expect(rewardManager.connect(owner).exit(await user.getAddress())).to.be.revertedWith('only module STAKE can call this function');
     });
 
     it('should decrease total supply', async function(){

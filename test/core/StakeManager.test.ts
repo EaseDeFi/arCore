@@ -3,8 +3,13 @@ import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
 import { increase } from "../utils";
+
+function stringToBytes32(str: string) : string {
+  return ethers.utils.formatBytes32String(str);
+}
 describe("StakeManager", function () {
   let accounts: Signer[];
+  let master: Contract;
   let rewardManager: Contract;
   let planManager: Contract;
   let claimManager: Contract;
@@ -12,26 +17,36 @@ describe("StakeManager", function () {
 
   let arNFT: Contract;
 
-  let user: Signer;
   let owner: Signer;
+  let user: Signer;
   beforeEach(async function () {
+    accounts = await ethers.getSigners();
+    owner = accounts[0];
+    user = accounts[3];
+    
+    const MasterFactory = await ethers.getContractFactory("ArmorMaster");
+    master = await MasterFactory.deploy();
+    await master.connect(owner).initialize();
+
     const StakeFactory = await ethers.getContractFactory("StakeManager");
     stakeManager = await StakeFactory.deploy();
-    const PlanFactory = await ethers.getContractFactory("PlanManagerMock");
-    const RewardFactory = await ethers.getContractFactory("RewardManagerMock");
-    const ClaimFactory = await ethers.getContractFactory("ClaimManagerMock");
-    const arNFTFactory = await ethers.getContractFactory("arNFTMock");
-
-    rewardManager = await RewardFactory.deploy();
-    planManager = await PlanFactory.deploy();
-    claimManager = await ClaimFactory.deploy();
-    arNFT = await arNFTFactory.deploy();
+    await stakeManager.connect(owner).initialize(master.address);
     
-    accounts = await ethers.getSigners(); 
-    user = accounts[4];
-    owner = accounts[0];
-    await stakeManager.connect(owner).initialize(arNFT.address, rewardManager.address, planManager.address, claimManager.address);
+    const PlanFactory = await ethers.getContractFactory("PlanManagerMock");
+    planManager = await PlanFactory.deploy();
+    await master.connect(owner).registerModule(stringToBytes32("PLAN"), planManager.address);
 
+    const RewardFactory = await ethers.getContractFactory("RewardManagerMock");
+    rewardManager = await RewardFactory.deploy();
+    await master.connect(owner).registerModule(stringToBytes32("REWARD"), rewardManager.address);
+    
+    const ClaimFactory = await ethers.getContractFactory("ClaimManagerMock");
+    claimManager = await ClaimFactory.deploy();
+    await master.connect(owner).registerModule(stringToBytes32("CLAIM"), claimManager.address);
+    
+    const arNFTFactory = await ethers.getContractFactory("arNFTMock");
+    arNFT = await arNFTFactory.deploy();
+    await master.connect(owner).registerModule(stringToBytes32("ARNFT"), arNFT.address);
   });
 
   describe("#stakeNft()", function(){
