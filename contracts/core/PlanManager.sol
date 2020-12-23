@@ -104,12 +104,12 @@ contract PlanManager is ArmorModule, IPlanManager {
             newPricePerSec += pricePerSec;
         }
 
+        //newPricePerSec = newPricePerSec * _markup;
         newPricePerSec = newPricePerSec * _markup / (10**18);
 
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;
         
-        //require(_protocols.length == _coverAmounts.length, "Input array lengths do not match.");
         bytes32 merkleRoot = _generateMerkleRoot(_protocols, _coverAmounts);
         Plan memory newPlan;
         newPlan = Plan(uint128(now), uint128(endTime), merkleRoot);

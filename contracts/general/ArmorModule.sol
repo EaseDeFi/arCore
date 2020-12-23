@@ -3,9 +3,12 @@
 pragma solidity ^0.6.0;
 
 import "../interfaces/IArmorMaster.sol";
-import "../general/Ownable.sol";
+import "./Ownable.sol";
+import "./Bytes32.sol";
 contract ArmorModule {
     IArmorMaster internal _master;
+
+    using Bytes32 for bytes32;
 
     modifier onlyOwner() {
         require(msg.sender == Ownable(address(_master)).owner(), "only owner can call this function");
@@ -18,7 +21,8 @@ contract ArmorModule {
     }
 
     modifier onlyModule(bytes32 _module) {
-        require(msg.sender == getModule(_module), "only module can call this function");
+        string memory message = string(abi.encodePacked("only module ", _module.toString()," can call this function"));
+        require(msg.sender == getModule(_module), message);
         _;
     }
 
