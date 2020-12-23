@@ -101,40 +101,4 @@ describe("StakeManager", function () {
       await expect(stakeManager.connect(user).stakeNft(1)).to.emit(stakeManager, 'StakedNFT');
     });
   });
-
-  describe("#removeExpiredNft()", async function(){
-    beforeEach(async function(){
-      await stakeManager.connect(owner).allowProtocol(arNFT.address, true);
-      await arNFT.connect(user).buyCover(
-        arNFT.address,
-        "0x45544800",
-        [100, 10, 1000, 10000000, 1],
-        100,
-        0,
-        ethers.utils.randomBytes(32),
-        ethers.utils.randomBytes(32)
-      );
-      await arNFT.connect(user).buyCover(
-        arNFT.address,
-        "0x45544800",
-        [100, 10, 1000, 10000000, 1],
-        100,
-        0,
-        ethers.utils.randomBytes(32),
-        ethers.utils.randomBytes(32)
-      );
-      await arNFT.connect(user).approve(stakeManager.address, 1);
-      await stakeManager.connect(user).stakeNft(1);
-    });
-
-    it("should fail if nft is not expired", async function(){
-      await arNFT.mockSetCoverStatus(1, 1);
-      await expect(stakeManager.connect(user).removeExpiredNft(1)).to.be.reverted;
-    });
-    
-    it("should success if nft is expired", async function(){
-      await arNFT.mockSetCoverStatus(1, 3);
-      await stakeManager.connect(user).removeExpiredNft(1);
-    });
-  });
 });
