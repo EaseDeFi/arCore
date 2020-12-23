@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
-describe.only("ArmorMaster", function () {
+describe("ArmorMaster", function () {
   let accounts: Signer[];
   let armorMaster: Contract;
   let armorModule: Contract;

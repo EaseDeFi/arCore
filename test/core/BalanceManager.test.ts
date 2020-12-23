@@ -39,11 +39,11 @@ describe("BalanceManager", function () {
     
     const TokenFactory = await ethers.getContractFactory("ArmorToken");
     token = await TokenFactory.deploy();
-    await master.connect(owner).registerModule(stringToBytes32("ARMOR"), planManager.address);
+    await master.connect(owner).registerModule(stringToBytes32("ARMOR"), token.address);
     
     const RewardFactory = await ethers.getContractFactory("RewardManager");
     rewardManager = await RewardFactory.deploy();
-    await master.connect(owner).registerModule(stringToBytes32("REWARD"), planManager.address);
+    await master.connect(owner).registerModule(stringToBytes32("REWARD"), rewardManager.address);
 
     const GovernanceStakerFactory = await ethers.getContractFactory("GovernanceStaker");
     governanceStaker = await GovernanceStakerFactory.deploy(token.address, constants.AddressZero);

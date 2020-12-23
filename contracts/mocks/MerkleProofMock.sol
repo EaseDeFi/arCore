@@ -3,7 +3,6 @@
 pragma solidity ^0.6.0;
 
 import "../libraries/MerkleProof.sol";
-import "hardhat/console.sol";
 contract MerkleProofMock {
   function calculateRoot(bytes32[] memory leaves) external pure returns(bytes32) {
     return MerkleProof.calculateRoot(leaves);

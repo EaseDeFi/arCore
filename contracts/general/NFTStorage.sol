@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.6;
-import "hardhat/console.sol";
 /**
  * @title NFT storage
  * @dev Keeps track of NFTs to allow us to easily remove them from coverage when they expire.
@@ -55,7 +54,6 @@ contract NFTStorage {
     {
         require(nftId != 0, "nft id 0 cannot be supported");
         uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
-        console.logUint(bucket);        
         if (head == 0) {
             // all the nfts are expired. so just add
             head = nftId;
@@ -156,7 +154,6 @@ contract NFTStorage {
 
     function pop(uint256 nftId, uint64 expiresAt) internal {
         uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
-        console.logUint(bucket);        
         // check if bucket is empty
         // if bucket is empty, reverts
         require(checkPoints[bucket].head != 0, "NFT does not exist:Bucket empty");
