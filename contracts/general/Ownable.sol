@@ -11,6 +11,7 @@ pragma solidity ^0.6.6;
  */
 contract Ownable {
     address private _owner;
+    address private _pendingOwner;
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -45,18 +46,7 @@ contract Ownable {
      */
     function isOwner() public view returns (bool) {
         return msg.sender == _owner;
-    }
 
-    /**
-     * @dev Allows the current owner to relinquish control of the contract.
-     * It will not be possible to call the functions with the `onlyOwner`
-     * modifier anymore.
-     * @notice Renouncing ownership will leave the contract without an owner,
-     * thereby removing any functionality that is only available to the owner.
-     */
-    function renounceOwnership() public onlyOwner {
-        emit OwnershipTransferred(_owner, address(0));
-        _owner = address(0);
     }
 
     /**
@@ -64,7 +54,12 @@ contract Ownable {
      * @param newOwner The address to transfer ownership to.
      */
     function transferOwnership(address newOwner) public onlyOwner {
-        _transferOwnership(newOwner);
+        _pendingOwner = newOwner;
+    }
+
+    function receiveOwnership() public {
+        require(msg.sender == _pendingOwner, "only pending owner can call this function");
+        _transferOwnership(_pendingOwner);
     }
 
     /**
