@@ -50,9 +50,9 @@ describe("BalanceManager", function () {
     await rewardManager.initialize(master.address, await user.getAddress(), balanceManager.address);
   });
 
-  describe.skip("#initialize()", function() {
+  describe("#initialize()", function() {
     it("should fail if already initialized", async function(){
-      await expect(balanceManager.connect(user).initialize(planManager.address, governanceStaker.address, rewardManager.address, await dev.getAddress())).to.be.revertedWith("Contract already initialized");
+      await expect(balanceManager.connect(user).initialize(master.address, await dev.getAddress())).to.be.revertedWith("already initialized");
     });
   });
 

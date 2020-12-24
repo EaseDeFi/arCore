@@ -136,5 +136,4 @@ contract ClaimManager is ArmorModule, IClaimManager {
         confirmedHacks[hackId] = true;
         emit ConfirmedHack(hackId, _protocol, _hackTime);
     }
-    
 }

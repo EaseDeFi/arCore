@@ -84,8 +84,8 @@ contract PlanManager is ArmorModule, IPlanManager {
           // Then go through, add new cover amounts, and make sure they do not pass cover allowed.
           _addNewTotals(_protocols, _coverAmounts);
           
-          // Set old plan to have ended now.
-          lastPlan.endTime = uint128(now);
+          // Set current plan to have ended now.
+          lastPlan.endTime = lastPlan.endTime <= now ? lastPlan.endTime : uint128(now);
         } else {
           _addNewTotals(_protocols, _coverAmounts);
         }
