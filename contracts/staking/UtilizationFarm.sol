@@ -117,13 +117,13 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address user, uint256 amount) public updateReward(msg.sender) {
+    function stake(address user, uint256 amount) public updateReward(user) {
         require(msg.sender == stakeController, "Caller is not the stake controller.");
         _addStake(user, amount);
         emit BalanceAdded(user, amount);
     }
 
-    function withdraw(address user, uint256 amount) public updateReward(msg.sender) {
+    function withdraw(address user, uint256 amount) public updateReward(user) {
         require(msg.sender == stakeController, "Caller is not the stake controller.");
         _removeStake(user, amount);
         emit BalanceWithdrawn(user, amount);
