@@ -3,6 +3,7 @@
 pragma solidity ^0.6.6;
 
 import '../general/ArmorModule.sol';
+import '../libraries/SafeMath.sol';
 import '../libraries/MerkleProof.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
@@ -13,6 +14,8 @@ import '../interfaces/IClaimManager.sol';
  * @dev Separating this off to specifically doKeep track of a borrower's plans.
 **/
 contract PlanManager is ArmorModule, IPlanManager {
+    
+    using SafeMath for uint;
     
     // List of plans that a user has purchased so there is a historical record.
     mapping (address => Plan[]) public plans;
@@ -98,10 +101,8 @@ contract PlanManager is ArmorModule, IPlanManager {
             require(nftCoverPrice[_protocols[i]] != 0, "Protocol price is zero");
             
             // nftCoverPrice is per full Ether, so a cover amont in Wei must be divided by 18 decimals after.
-            // ** This can result in overflow, we need safemath for this
-            uint256 pricePerSec = nftCoverPrice[ _protocols[i] ] * _coverAmounts[i];
-            // ** This needs safemath too
-            newPricePerSec += pricePerSec;
+            uint256 pricePerSec = nftCoverPrice[ _protocols[i] ].mul(_coverAmounts[i]);
+            newPricePerSec = newPricePerSec.add(pricePerSec);
         }
 
         //newPricePerSec = newPricePerSec * _markup / 1e18 for decimals / 100 to make up for markup (200 == 200%);
@@ -143,13 +144,13 @@ contract PlanManager is ArmorModule, IPlanManager {
     function _removeOldTotals(address[] memory _oldProtocols, uint256[] memory _oldCoverAmounts) internal{
         for (uint256 i = 0; i < _oldProtocols.length; i++) {
             address protocol = _oldProtocols[i];
-            totalUsedCover[protocol] -= _oldCoverAmounts[i];
+            totalUsedCover[protocol] = totalUsedCover[protocol].sub(_oldCoverAmounts[i]);
         }
     }
 
     function _addNewTotals(address[] memory _newProtocols, uint256[] memory _newCoverAmounts) internal {
         for (uint256 i = 0; i < _newProtocols.length; i++) {
-            totalUsedCover[_newProtocols[i]] += _newCoverAmounts[i];
+            totalUsedCover[_newProtocols[i]] = totalUsedCover[_newProtocols[i]].add(_newCoverAmounts[i]);
             // Check StakeManager to ensure the new total amount does not go above the staked amount.
             require(IStakeManager(getModule("STAKE")).allowedCover(_newProtocols[i], totalUsedCover[_newProtocols[i]]), "Exceeds total cover amount");
         }
