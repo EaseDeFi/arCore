@@ -27,7 +27,7 @@ contract PlanManager is ArmorModule, IPlanManager {
 
     mapping (address => uint256) public totalUsedCover;
     
-    // The amount of markup for Armor's service vs. the original cover cost.
+    // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
     uint256 public markup;
     
     // Mapping = protocol => cover amount
@@ -42,7 +42,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         address _armorMaster
     ) external override {
         initializeModule(_armorMaster);
-        markup = 2;
+        markup = 150;
     }
 
     function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end,  bytes32 root){
@@ -104,8 +104,8 @@ contract PlanManager is ArmorModule, IPlanManager {
             newPricePerSec += pricePerSec;
         }
 
-        //newPricePerSec = newPricePerSec * _markup;
-        newPricePerSec = newPricePerSec * _markup / (10**18);
+        //newPricePerSec = newPricePerSec * _markup / 1e18 for decimals / 100 to make up for markup (200 == 200%);
+        newPricePerSec = newPricePerSec * _markup / (10**18) / 100;
 
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;
@@ -214,8 +214,20 @@ contract PlanManager is ArmorModule, IPlanManager {
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(_user);
         uint256 pricePerSec = IBalanceManager(getModule("BALANCE")).perSecondPrice(_user);
         
-        if(plan.endTime >= now){
+        if (plan.endTime >= now){
             plan.endTime = uint128(balance / pricePerSec + now);
         }
+    }
+    
+    /**
+     * @dev Owner (DAO) can adjust the markup buyers pay for coverage.
+     * @param _newMarkup The new markup that will be used. 100 == 100% (no markup).
+    **/
+    function adjustMarkup(uint256 _newMarkup)
+      external
+      onlyOwner
+    {
+        require(_newMarkup >= 100, "Markup must be at least 0 (100%).");
+        markup = _newMarkup;
     }
 }
