@@ -71,7 +71,7 @@ contract BalanceManager is ArmorModule, IBalanceManager {
         devWallet = _devWallet;
         devPercent = 0;     // 0 %
         refPercent = 25;    // 2.5%
-        govPercent = 75;    // 7.5%
+        govPercent = 25;    // 2.5%
     }
 
     /**
