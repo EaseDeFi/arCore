@@ -26,8 +26,6 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // Mapping to doKeep track of how much coverage we've sold for each protocol.
     // smart contract address => total borrowed cover
-    mapping (address => uint256) public totalBorrowedAmount;
-
     mapping (address => uint256) public totalUsedCover;
     
     // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
