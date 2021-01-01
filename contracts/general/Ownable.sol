@@ -60,6 +60,7 @@ contract Ownable {
     function receiveOwnership() public {
         require(msg.sender == _pendingOwner, "only pending owner can call this function");
         _transferOwnership(_pendingOwner);
+        _pendingOwner = address(0);
     }
 
     /**
