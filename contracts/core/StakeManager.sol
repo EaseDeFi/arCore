@@ -3,7 +3,7 @@
 pragma solidity ^0.6.6;
 
 import '../general/Ownable.sol';
-import '../general/NFTStorage.sol';
+import '../general/ExpireTracker.sol';
 import '../general/ArmorModule.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
@@ -17,7 +17,7 @@ import '../interfaces/IStakeManager.sol';
 /**
  * @dev Encompasses all functions taken by stakers.
 **/
-contract StakeManager is ArmorModule, NFTStorage, IStakeManager {
+contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     
     using SafeMath for uint;
     
@@ -120,7 +120,7 @@ contract StakeManager is ArmorModule, NFTStorage, IStakeManager {
         address user = nftOwners[_nftId];
         require(user != address(0), "NFT does not belong here.");
 
-        pop(_nftId, uint64(validuntil));
+        ExpireTracker.pop(_nftId, uint64(validuntil));
         //TODO add functionality to remove by nft id in nftstorage
         
         uint256 weiSumAssured = sumAssured * (10 ** 18);
@@ -209,7 +209,7 @@ contract StakeManager is ArmorModule, NFTStorage, IStakeManager {
         
         IarNFT(getModule("ARNFT")).transferFrom(_user, getModule("CLAIM"), _nftId);
 
-        push(uint96(_nftId), uint64(validUntil));
+        ExpireTracker.push(uint96(_nftId), uint64(validUntil));
         // Save owner of NFT.
         nftOwners[_nftId] = _user;
 

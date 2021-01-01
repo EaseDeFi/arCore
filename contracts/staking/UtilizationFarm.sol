@@ -5,6 +5,7 @@ pragma solidity ^0.6.6;
 import '../general/Ownable.sol';
 import '../general/SafeERC20.sol';
 import '../general/BalanceWrapper.sol';
+import '../general/ExpireTracker.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
@@ -39,7 +40,7 @@ import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipientTokenOnly {
+contract UtilizationFarm is BalanceWrapper, Ownable, ExpireTracker, IRewardDistributionRecipientTokenOnly {
     using SafeERC20 for IERC20;
 
     IERC20 public rewardToken;
@@ -54,6 +55,20 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
+    //decay functionality
+    mapping(uint96 => DecayTracker) public decayInfo;
+    mapping(address => uint96) internal decayInfoOf;
+    uint96 public decayInfoCount;
+    // TODO: need to add keep() to make totalDecayRatio to be up to date
+    uint256 public totalDecayRatio;
+
+
+    struct DecayTracker {
+        address staker;
+        uint64 expiresAt;
+        uint256 decayRatio;
+    }
+
     event RewardAdded(uint256 reward);
     event BalanceAdded(address indexed user, uint256 amount);
     event BalanceWithdrawn(address indexed user, uint256 amount);
@@ -61,6 +76,7 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
 
     modifier updateReward(address account) {
         rewardPerTokenStored = rewardPerToken();
+        _totalSupply = totalSupply();
         lastUpdateTime = lastTimeRewardApplicable();
         if (account != address(0)) {
             rewards[account] = earned(account);
@@ -72,6 +88,14 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
     modifier onlyRewardDistribution() {
         require(msg.sender == rewardDistribution, "Caller is not reward distribution");
         _;
+    }
+
+    function totalSupply() public view returns(uint256) {
+        uint256 timediff = lastTimeRewardApplicable().sub(lastUpdateTime);
+        return _totalSupply.sub(timediff.mul(totalDecayRatio));
+    }
+
+    function balanceOf(address user) public view returns(uint256) {
     }
 
     function initialize(address _rewardToken, address _stakeController)
@@ -95,17 +119,51 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
     }
 
     function rewardPerToken() public view returns (uint256) {
+        //TODO: update this
         if (totalSupply() == 0) {
             return rewardPerTokenStored;
         }
+        uint256 timediff = lastTimeRewardApplicable().sub(lastUpdateTime);
         return
             rewardPerTokenStored.add(
-                lastTimeRewardApplicable()
-                    .sub(lastUpdateTime)
+                timediff
                     .mul(rewardRate)
                     .mul(1e18)
-                    .div(totalSupply())
+                    .div(
+                        totalSupply()
+                        .add(
+                            timediff.mul(totalDecayRatio).div(2)
+                        )
+                    )
             );
+    }
+
+    function keep() external {
+        // TODO: check if any decay ratio is going to be expired
+    }
+
+    function _updateDecayRatio(address user, uint256 decayRatio) internal {
+        if(decayInfoOf[user] != 0){
+            //POP
+            uint96 decayId = decayInfoOf[user];
+            uint256 oldDecayRatio = decayInfo[decayId].decayRatio;
+            uint64 oldExpiresAt = decayInfo[decayId].expiresAt;
+            ExpireTracker.pop(expireId, oldExpiresAt);
+            //push again
+            uint256 expiresAt = balanceOf(user).div(decayRatio);
+            decayInfoOf[user] = 
+            ExpireTracker.push(decayId, expiresAt);
+        } else {
+            //push
+            uint256 decayId = ++decayInfoCount;
+            uint256 expiresAt = balanceOf(user).div(decayRatio);
+            ExpireTracker.push(decayId, expiresAt);
+            decayInfoOf[user] = DecayInfo(user, expiresAt);
+        }
+        emit DecayRatioUpdated(user, decayRatio, expiresAt);
+    }
+
+    function _expireDecayInfo(uint96 decayId) internal {
     }
 
     function earned(address account) public view returns (uint256) {
@@ -117,17 +175,22 @@ contract UtilizationFarm is BalanceWrapper, Ownable, IRewardDistributionRecipien
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address user, uint256 amount) public updateReward(user) {
+    function stake(address user, uint256 amount, uint256 decayRatio) public updateReward(user) {
         require(msg.sender == stakeController, "Caller is not the stake controller.");
         _addStake(user, amount);
+        _updateDecayRatio(user, decayRatio);
         emit BalanceAdded(user, amount);
     }
 
     function withdraw(address user, uint256 amount) public updateReward(user) {
         require(msg.sender == stakeController, "Caller is not the stake controller.");
         _removeStake(user, amount);
+        uint96 decayId = decayInfoOf[user];
+        uint256 decayRatio = decayInfo[decayId].decayRatio;
+        _updateDecayRatio(user, decayRatio);
         emit BalanceWithdrawn(user, amount);
     }
+
 
     function exit() external {
         withdraw(msg.sender, balanceOf(msg.sender));

@@ -30,13 +30,17 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
     uint256 public markup;
-    
+
     // Mapping = protocol => cover amount
     struct Plan {
-        uint128 startTime;
-        uint128 endTime;
-        bytes32 merkleRoot;
-        mapping(address => bool) claimed;
+        uint64 startTime;
+        uint64 endTime;
+        uint64 length;
+    }
+
+    struct ProtocolPlan {
+        uint64 protocolId;
+        uint192 amount;
     }
     
     function initialize(
@@ -46,19 +50,18 @@ contract PlanManager is ArmorModule, IPlanManager {
         markup = 150;
     }
 
-    function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end,  bytes32 root){
+    function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end){
         if(plans[_user].length == 0){
-            return(0,0,bytes32(0));
+            return(0,0);
         }
         Plan memory plan = plans[_user][plans[_user].length-1];
         
         //return 0 if there is no active plan
         if(plan.endTime < now){
-            return(0,0,bytes32(0));
+            return(0,0);
         } else {
             start = plan.startTime;
             end = plan.endTime;
-            root = plan.merkleRoot;
         }
     }
     
@@ -68,7 +71,7 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @param _coverAmounts The amount of coverage desired in WEI.
      * @notice Let's simplify this somehow--even just splitting into different functions.
     **/
-    function updatePlan(address[] calldata _oldProtocols, uint256[] calldata _oldCoverAmounts, address[] calldata _protocols, uint256[] calldata _coverAmounts)
+    function updatePlan(address[] calldata _protocols, uint256[] calldata _coverAmounts)
       external
       doKeep
       override
@@ -77,20 +80,14 @@ contract PlanManager is ArmorModule, IPlanManager {
         if(plans[msg.sender].length > 0){
           Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
 
-          require(_generateMerkleRoot(_oldProtocols, _oldCoverAmounts) == lastPlan.merkleRoot, "Merkle Root from provided values are not correct");
-          
           // First go through and subtract all old cover amounts.
           _removeOldTotals(_oldProtocols, _oldCoverAmounts);
           
-          // Then go through, add new cover amounts, and make sure they do not pass cover allowed.
-          _addNewTotals(_protocols, _coverAmounts);
-          
           // Set current plan to have ended now.
           lastPlan.endTime = lastPlan.endTime <= now ? lastPlan.endTime : uint128(now);
-        } else {
-          _addNewTotals(_protocols, _coverAmounts);
         }
 
+        _addNewTotals(_protocols, _coverAmounts);
         uint256 newPricePerSec;
         uint256 _markup = markup;
         

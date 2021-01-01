@@ -2,10 +2,10 @@
 
 pragma solidity ^0.6.6;
 /**
- * @title NFT storage
- * @dev Keeps track of NFTs to allow us to easily remove them from coverage when they expire.
+ * @title Expire Traker
+ * @dev Keeps track of expirement
 **/
-contract NFTStorage {
+contract ExpireTracker {
     // 1 day for each step.
     uint64 public constant BUCKET_STEP = 86400;
 
@@ -23,11 +23,11 @@ contract NFTStorage {
     // points last active nft
     uint96 public tail;
 
-    // maps nftId to deposit info
-    mapping(uint96 => DepositInfo) public infos; 
+    // maps expireId to deposit info
+    mapping(uint96 => ExpireMetadata) public infos; 
     
     // pack data to reduce gas
-    struct DepositInfo {
+    struct ExpireMetadata {
         uint96 next; // zero if there is no further information
         uint96 prev;
         uint64 expiresAt;
@@ -48,18 +48,18 @@ contract NFTStorage {
     /**
      * @notice Let's add SafeMath to this
     **/
-    // using typecasted nftId to save gas
-    function push(uint96 nftId, uint64 expiresAt) 
+    // using typecasted expireId to save gas
+    function push(uint96 expireId, uint64 expiresAt) 
       internal 
     {
-        require(nftId != 0, "nft id 0 cannot be supported");
+        require(expireId != 0, "info id 0 cannot be supported");
         uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
         if (head == 0) {
             // all the nfts are expired. so just add
-            head = nftId;
-            tail = nftId; 
-            checkPoints[bucket] = Bucket(nftId, nftId);
-            infos[nftId] = DepositInfo(0,0,expiresAt);
+            head = expireId;
+            tail = expireId; 
+            checkPoints[bucket] = Bucket(expireId, expireId);
+            infos[expireId] = ExpireMetadata(0,0,expiresAt);
             
             return;
         }
@@ -69,16 +69,16 @@ contract NFTStorage {
         if (infos[head].expiresAt >= expiresAt) {
             // pushing nft is going to expire first
             // update head
-            infos[nftId] = DepositInfo(0,head,expiresAt);
-            head = nftId;
+            infos[expireId] = ExpireMetadata(0,head,expiresAt);
+            head = expireId;
             
             // update head of bucket
             Bucket storage b = checkPoints[bucket];
-            b.head = nftId;
+            b.head = expireId;
                 
             if(b.tail == 0) {
-                // if tail is zero, this bucket was empty should fill tail with nftId
-                b.tail = nftId;
+                // if tail is zero, this bucket was empty should fill tail with expireId
+                b.tail = expireId;
             }
                 
             // this case can end now
@@ -88,16 +88,16 @@ contract NFTStorage {
         // then check if depositing nft will last more than latest
         if (infos[tail].expiresAt <= expiresAt) {
             // push nft at tail
-            infos[nftId] = DepositInfo(tail,0,expiresAt);
-            tail = nftId;
+            infos[expireId] = ExpireMetadata(tail,0,expiresAt);
+            tail = expireId;
             
             // update tail of bucket
             Bucket storage b = checkPoints[bucket];
-            b.tail = nftId;
+            b.tail = expireId;
             
             if(b.head == 0){
-              // if head is zero, this bucket was empty should fill head with nftId
-              b.head = nftId;
+              // if head is zero, this bucket was empty should fill head with expireId
+              b.head = expireId;
             }
             
             // this case is done now
@@ -115,19 +115,19 @@ contract NFTStorage {
                 cursor = infos[cursor].next;
             }
         
-            infos[nftId] = DepositInfo(cursor, infos[cursor].prev, expiresAt);
-            infos[infos[cursor].prev].next = nftId;
-            infos[cursor].prev = nftId;
+            infos[expireId] = ExpireMetadata(cursor, infos[cursor].prev, expiresAt);
+            infos[infos[cursor].prev].next = expireId;
+            infos[cursor].prev = expireId;
         
             //now update bucket's head/tail data
             Bucket storage b = checkPoints[bucket];
             
-            if (infos[b.head].prev == nftId){
-                b.head = nftId;
+            if (infos[b.head].prev == expireId){
+                b.head = expireId;
             }
             
-            if (infos[b.tail].next == nftId){
-                b.tail = nftId;
+            if (infos[b.tail].next == expireId){
+                b.tail = expireId;
             }
         } else {
             //bucket is empty
@@ -143,26 +143,26 @@ contract NFTStorage {
             uint96 next = infos[prev].next;
     
             // step 2 link prev buckets tail - nft - next buckets head
-            infos[nftId] = DepositInfo(next,prev,expiresAt);
-            infos[prev].next = nftId;
-            infos[next].prev = nftId;
+            infos[expireId] = ExpireMetadata(next,prev,expiresAt);
+            infos[prev].next = expireId;
+            infos[next].prev = expireId;
     
-            checkPoints[bucket].head = nftId;
-            checkPoints[bucket].tail = nftId;
+            checkPoints[bucket].head = expireId;
+            checkPoints[bucket].tail = expireId;
         }
     }
 
-    function pop(uint256 nftId, uint64 expiresAt) internal {
+    function pop(uint96 expireId, uint64 expiresAt) internal {
         uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
         // check if bucket is empty
         // if bucket is empty, reverts
-        require(checkPoints[bucket].head != 0, "NFT does not exist:Bucket empty");
+        require(checkPoints[bucket].head != 0, "Info does not exist:Bucket empty");
         // if bucket is not empty, iterate through
         // if expiresAt of current cursor is larger than expiresAt of parameter, reverts
         for(uint96 cursor = checkPoints[bucket].head; infos[cursor].expiresAt <= expiresAt; cursor = infos[cursor].next) {
-            DepositInfo memory info = infos[cursor];
-            // if expiresAt is same of paramter, check if nftId is same
-            if(info.expiresAt == expiresAt && cursor == nftId) {
+            ExpireMetadata memory info = infos[cursor];
+            // if expiresAt is same of paramter, check if expireId is same
+            if(info.expiresAt == expiresAt && cursor == expireId) {
                 // if yes, delete it
                 // if cursor was head, move head to cursor.next
                 if(head == cursor) {
@@ -193,8 +193,8 @@ contract NFTStorage {
                 delete infos[cursor];
                 return;
             }
-            // if not, continue -> since there can be same expires at with multiple nftId
+            // if not, continue -> since there can be same expires at with multiple expireId
         }
-        revert("NFT does not exist");
+        revert("Info does not exist");
     }
 }

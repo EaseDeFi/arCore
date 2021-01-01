@@ -7,8 +7,8 @@ import '../libraries/SafeMath.sol';
 contract BalanceWrapper {
     using SafeMath for uint256;
 
-    uint256 private _totalSupply;
-    mapping(address => uint256) private _balances;
+    uint256 internal _totalSupply;
+    mapping(address => uint256) internal _balances;
 
     function totalSupply() public view returns (uint256) {
         return _totalSupply;
