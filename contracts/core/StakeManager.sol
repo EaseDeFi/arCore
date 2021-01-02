@@ -27,6 +27,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     uint256 withdrawalDelay;
     
     // Protocols that staking is allowed for. We may not allow all NFTs.
+    mapping (address => bool) public allowedProtocol;
     mapping (address => uint64) public override protocolId;
     mapping (uint64 => address) public override protocolAddress;
     uint64 protocolCount;
@@ -263,7 +264,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         require(_validUntil > now + 86400, "NFT is expired or within 1 day of expiry.");
         // TODO: should change this to check status not claimId
         require(_coverStatus == 0, "arNFT claim is already in progress.");
-        require(protocolId[_scAddress] != 0, "Protocol is not allowed to be staked.");
+        require(allowedProtocol[_scAddress], "Protocol is not allowed to be staked.");
         require(_coverCurrency == ETH_SIG, "Only Ether arNFTs may be staked.");
     }
     
@@ -277,8 +278,11 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       doKeep
       onlyOwner
     {
-        protocolId[_protocol] = ++protocolCount;
-        protocolAddress[protocolCount] = _protocol;
+        if(protocolId[_protocol] == 0){
+            protocolId[_protocol] = ++protocolCount;
+            protocolAddress[protocolCount] = _protocol;
+        }
+        allowedProtocol[_protocol] = _allow;
     }
     
     /**
