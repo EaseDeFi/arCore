@@ -46,7 +46,7 @@ contract ClaimManager is ArmorModule, IClaimManager {
      * @param _hackTime The given timestamp for when the hack occurred.
      * @notice Make sure this cannot be done twice. I also think this protocol interaction can be simplified.
     **/
-    function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount, bytes32[] calldata _path)
+    function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount)
       external
       doKeep
     {
@@ -55,7 +55,7 @@ contract ClaimManager is ArmorModule, IClaimManager {
         
         // Gets the coverage amount of the user at the time the hack happened.
         // TODO check if plan is not active now => to prevent users paying more than needed
-        (uint256 planIndex, bool covered) = IPlanManager(getModule("PLAN")).checkCoverage(msg.sender, _protocol, _hackTime, _amount, _path);
+        (uint256 planIndex, bool covered) = IPlanManager(getModule("PLAN")).checkCoverage(msg.sender, _protocol, _hackTime, _amount);
         require(covered, "User does not have valid amount, check path and amount");
         
         // Put Ether into 18 decimal format.

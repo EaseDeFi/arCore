@@ -19,6 +19,9 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // List of plans that a user has purchased so there is a historical record.
     mapping (address => Plan[]) public plans;
+
+    // keccak256("ARMORFI.PLAN", address(user), uint256(planIdx), uint256(protocolIdx)) => ProtocolPlan
+    mapping (bytes32 => ProtocolPlan) public protocolPlan;
     
     // StakeManager calls this when a new NFT is added to update what the price for that protocol is.
     // Cover price in ETH (1e18) of price per second per DAI covered.
@@ -35,7 +38,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     struct Plan {
         uint64 startTime;
         uint64 endTime;
-        uint64 length;
+        uint128 length;
     }
 
     struct ProtocolPlan {
@@ -81,10 +84,10 @@ contract PlanManager is ArmorModule, IPlanManager {
           Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
 
           // First go through and subtract all old cover amounts.
-          _removeOldTotals(_oldProtocols, _oldCoverAmounts);
+          _removeLatestTotals(msg.sender);
           
           // Set current plan to have ended now.
-          lastPlan.endTime = lastPlan.endTime <= now ? lastPlan.endTime : uint128(now);
+          lastPlan.endTime = lastPlan.endTime <= now ? lastPlan.endTime : uint64(now);
         }
 
         _addNewTotals(_protocols, _coverAmounts);
@@ -106,10 +109,16 @@ contract PlanManager is ArmorModule, IPlanManager {
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
         uint256 endTime = balance / newPricePerSec + now;
         
-        bytes32 merkleRoot = _generateMerkleRoot(_protocols, _coverAmounts);
+        //add plan
         Plan memory newPlan;
-        newPlan = Plan(uint128(now), uint128(endTime), merkleRoot);
+        newPlan = Plan(uint64(now), uint64(endTime), uint128(_protocols.length));
         plans[msg.sender].push(newPlan);
+        //add protocol plan
+        for(uint256 i = 0;i<_protocols.length; i++){
+            bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",msg.sender,plans[msg.sender].length - 1,i));
+            uint64 protocolId = IStakeManager(getModule("STAKE")).protocolId(_protocols[i]);
+            protocolPlan[key] = ProtocolPlan(protocolId, uint192(_coverAmounts[i]));
+        }
         
         // update balance price per second here
         IBalanceManager(getModule("BALANCE")).changePrice(msg.sender, newPricePerSec);
@@ -117,29 +126,19 @@ contract PlanManager is ArmorModule, IPlanManager {
         emit PlanUpdate(msg.sender, _protocols, _coverAmounts, endTime);
     }
 
-    // should be sorted merkletree. should be calculated off chain
-    function _generateMerkleRoot(address[] memory _protocols, uint256[] memory _coverAmounts) 
-      internal 
-      pure
-    returns (bytes32)
-    
-    {
-        require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
-        bytes32[] memory leaves = new bytes32[](_protocols.length);
-        for(uint256 i = 0 ; i<_protocols.length; i++){
-            bytes32 leaf = keccak256(abi.encodePacked(_protocols[i],_coverAmounts[i]));
-            leaves[i] = leaf;
-        }
-        return MerkleProof.calculateRoot(leaves);
-    }
-    
     /**
      * @dev Update the contract-wide totals for each protocol that has changed.
     **/
-    function _removeOldTotals(address[] memory _oldProtocols, uint256[] memory _oldCoverAmounts) internal{
-        for (uint256 i = 0; i < _oldProtocols.length; i++) {
-            address protocol = _oldProtocols[i];
-            totalUsedCover[protocol] = totalUsedCover[protocol].sub(_oldCoverAmounts[i]);
+    function _removeLatestTotals(address _user) internal{
+        Plan storage plan = plans[_user][plans[_user].length - 1];
+
+        uint256 idx = plans[_user].length - 1;
+
+        for (uint256 i = 0; i < plan.length; i++) {
+            bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,idx,i));
+            ProtocolPlan memory protocol = protocolPlan[key];
+            address protocolAddress = IStakeManager(getModule("STAKE")).protocolAddress(protocol.protocolId);
+            totalUsedCover[protocolAddress] = totalUsedCover[protocolAddress].sub(uint256(protocol.amount));
         }
     }
 
@@ -159,7 +158,7 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @return index index of plan for hackTime
      * @return check 
     **/
-    function checkCoverage(address _user, address _protocol, uint256 _hackTime, uint256 _amount, bytes32[] calldata _path)
+    function checkCoverage(address _user, address _protocol, uint256 _hackTime, uint256 _amount)
       external
       view
       override
@@ -175,7 +174,13 @@ contract PlanManager is ArmorModule, IPlanManager {
             // Only one plan will be active at the time of a hack--return cover amount from then.
             if (_hackTime >= plan.startTime && _hackTime < plan.endTime) {
                 //typecast -- is it safe?
-                return (uint256(i), !plan.claimed[_protocol] && MerkleProof.verify(_path, plan.merkleRoot, keccak256(abi.encodePacked(_protocol, _amount))));
+                for(uint256 j = 0; j<= plan.length; j++){
+                    bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,i,j));
+                    if(IStakeManager(getModule("STAKE")).protocolAddress(protocolPlan[key].protocolId) == _protocol){
+                        return (uint256(i), _amount <= uint256(protocolPlan[key].amount));
+                    }
+                }
+                return (uint256(i), false);
             }
         }
         return (uint256(-1), false);
@@ -184,7 +189,8 @@ contract PlanManager is ArmorModule, IPlanManager {
     function planRedeemed(address _user, uint256 _planIndex, address _protocol) external override onlyModule("CLAIM"){
         Plan storage plan = plans[_user][_planIndex];
         require(plan.endTime < now, "Cannot redeem active plan, update plan to redeem properly");
-        plan.claimed[_protocol] = true;
+        //plan.claimed[_protocol] = true;
+        //TODO reduce cover amount of plan
     }
 
     /**
@@ -211,7 +217,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         uint256 pricePerSec = IBalanceManager(getModule("BALANCE")).perSecondPrice(_user);
         
         if (plan.endTime >= now){
-            plan.endTime = uint128(balance / pricePerSec + now);
+            plan.endTime = uint64(balance / pricePerSec + now);
         }
     }
     
