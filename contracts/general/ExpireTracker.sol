@@ -152,7 +152,8 @@ contract ExpireTracker {
         }
     }
 
-    function pop(uint96 expireId, uint64 expiresAt) internal {
+    function pop(uint96 expireId) internal {
+        uint64 expiresAt = infos[expireId].expiresAt;
         uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
         // check if bucket is empty
         // if bucket is empty, reverts
@@ -197,4 +198,6 @@ contract ExpireTracker {
         }
         revert("Info does not exist");
     }
+
+    uint256[50] private __gap;
 }
