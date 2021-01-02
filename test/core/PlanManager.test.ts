@@ -53,6 +53,7 @@ describe("PlanManager", function () {
     await planManager.connect(owner).initialize(master.address);
     //mock setting
     await stakeManager.connect(owner).mockSetPlanManager(planManager.address);
+    await stakeManager.connect(owner).allowProtocol(balanceManager.address, true);
   });
 
   describe("#initialize()", function() {
@@ -79,31 +80,25 @@ describe("PlanManager", function () {
       await balanceManager.setBalance(await user.getAddress(), userBalance);
     });
 
-    it("should fail if given old values does not match the stored value", async function(){
-      await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
-      await expect(planManager.connect(user).updatePlan([balanceManager.address],[coverAmount.add(1)],[balanceManager.address], [coverAmount])).to.be.revertedWith("Merkle Root from provided values are not correct");
-    });
-    
     it("should fail if parameter length is different", async function(){
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount);
-      await expect(planManager.updatePlan([],[],[balanceManager.address],[coverAmount, coverAmount.add(price)])).to.be.revertedWith("protocol and coverAmount length mismatch");
+      await expect(planManager.updatePlan([balanceManager.address],[coverAmount, coverAmount.add(price)])).to.be.revertedWith("protocol and coverAmount length mismatch");
     });
     
     it("should fail if protocol's nft price is zero", async function(){
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount);
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, 0);
-      await expect(planManager.updatePlan([],[],[balanceManager.address],[coverAmount])).to.be.revertedWith("Protocol price is zero");
+      await expect(planManager.updatePlan([balanceManager.address],[coverAmount])).to.be.revertedWith("Protocol price is zero");
     });
     
     it("should fail if exceeds protocol limit", async function(){
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.sub(price));
-      await expect(planManager.updatePlan([],[],[balanceManager.address], [coverAmount])).to.be.revertedWith("Exceeds total cover amount");
+      await expect(planManager.updatePlan([balanceManager.address], [coverAmount])).to.be.revertedWith("Exceeds total cover amount");
     });
     
     it("should update plan", async function(){
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.add(price));
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       const merkle = new OrderedMerkleTree([plan.root]);
       expect(plan.root).to.equal(merkle.calculateRoot());
@@ -111,18 +106,18 @@ describe("PlanManager", function () {
 
     it("should increase totalUsedCover", async function(){
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.add(price));
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       expect((await planManager.totalUsedCover(balanceManager.address)).toString()).to.equal(coverAmount.toString());
     });
 
     it("should return true for checkCoverage", async function(){
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(1000));
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       const merkle = new OrderedMerkleTree([plan.root]);
       const path = merkle.getPath(0);
       await increase(10000);
-      await planManager.connect(user).updatePlan([balanceManager.address],[coverAmount],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       expect((await planManager.checkCoverage(await user.getAddress(), balanceManager.address, plan.end.sub(1), coverAmount, path)).check).to.equal(true);
       expect((await planManager.checkCoverage(await unknownUser.getAddress(), balanceManager.address, plan.end.sub(1), coverAmount, path)).check).to.equal(false);
     });
@@ -131,8 +126,8 @@ describe("PlanManager", function () {
       await stakeManager.mockSetPlanManagerPrice(stakeManager.address, price);
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount);
       await stakeManager.mockLimitSetter(stakeManager.address, coverAmount);
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
-      await planManager.connect(user).updatePlan([balanceManager.address],[coverAmount],[balanceManager.address, stakeManager.address,], [coverAmount, coverAmount.sub(price)]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address, stakeManager.address,], [coverAmount, coverAmount.sub(price)]);
     });
   });
 
@@ -150,7 +145,7 @@ describe("PlanManager", function () {
       await balanceManager.setBalance(await user.getAddress(), userBalance);
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.add(price));
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       await increase(plan.end.add(1000).toNumber());
       await balanceManager.updateExpireTime(planManager.address, await user.getAddress());
@@ -161,7 +156,7 @@ describe("PlanManager", function () {
       await balanceManager.setBalance(await user.getAddress(), userBalance);
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.add(price));
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       await balanceManager.updateExpireTime(planManager.address, await user.getAddress());
     });
   });
@@ -172,7 +167,7 @@ describe("PlanManager", function () {
       await balanceManager.setBalance(await user.getAddress(), userBalance);
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.add(price));
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
     });
     it('should fail if msg.sender is not claimmanger', async function(){
       await expect(planManager.connect(user).planRedeemed(await user.getAddress(), 0, balanceManager.address)).to.be.revertedWith("only module CLAIM can call this function");
@@ -199,7 +194,7 @@ describe("PlanManager", function () {
       await balanceManager.setBalance(await user.getAddress(), userBalance);
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.add(price));
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       await increase(plan.end.add(1000).toNumber());
       const expired = await planManager.getCurrentPlan(await user.getAddress());
@@ -212,7 +207,7 @@ describe("PlanManager", function () {
       await balanceManager.setBalance(await user.getAddress(), userBalance);
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.add(price));
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
-      await planManager.connect(user).updatePlan([],[],[balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       await increase(plan.end.add(1000).toNumber());
       await planManager.getCurrentPlan(await user.getAddress());

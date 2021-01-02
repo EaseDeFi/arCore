@@ -79,6 +79,7 @@ contract PlanManager is ArmorModule, IPlanManager {
       doKeep
       override
     {
+        require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
         // Need to get price of the protocol here
         if(plans[msg.sender].length > 0){
           Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
