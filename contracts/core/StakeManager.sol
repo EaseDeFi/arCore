@@ -33,7 +33,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     uint64 protocolCount;
     
     // The total amount of cover that is currently being staked. scAddress => cover amount
-    mapping (address => uint256) public totalStakedAmount;
+    mapping (address => uint256) public override totalStakedAmount;
     
     // Mapping to keep track of which NFT is owned by whom. NFT ID => owner address.
     mapping (uint256 => address) public nftOwners;

@@ -150,6 +150,19 @@ contract PlanManager is ArmorModule, IPlanManager {
             require(IStakeManager(getModule("STAKE")).allowedCover(_newProtocols[i], totalUsedCover[_newProtocols[i]]), "Exceeds total cover amount");
         }
     }
+
+    function coverageLeft(address _protocol)
+        external
+        override
+        view
+    returns(uint256) {
+        uint256 stakedAmount = IStakeManager(getModule("STAKE")).totalStakedAmount(_protocol);
+        uint256 used = totalUsedCover[_protocol];
+        if(used > stakedAmount) {
+            return 0;
+        }
+        return stakedAmount.sub(used);
+    }
     
     /**
      * @dev Used by ClaimManager to check how much coverage the user had at the time of a hack.

@@ -8,8 +8,14 @@ import "../general/Keeper.sol";
 
 contract ArmorMaster is Ownable, IArmorMaster {
     mapping(bytes32 => address) internal _modules;
+    mapping(bytes32 => Hook[]) internal _hookRecipients;
 
     bytes32[] internal _jobs;
+
+    struct Hook {
+        address recipient;
+        bytes8 sig;
+    }
 
     function initialize() external {
         Ownable.initializeOwnable();
@@ -44,6 +50,7 @@ contract ArmorMaster is Ownable, IArmorMaster {
         revert("job not found");
     }
 
+    //anyone can call this function
     function keep() external override {
         for(uint256 i = 0; i < _jobs.length; i++) {
             IKeeperRecipient(_modules[_jobs[i]]).keep();
@@ -53,4 +60,5 @@ contract ArmorMaster is Ownable, IArmorMaster {
     function jobs() external view returns(bytes32[] memory) {
         return _jobs;
     }
+
 }
