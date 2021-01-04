@@ -2,8 +2,9 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/ArmorModule.sol';
 import '../general/Keeper.sol';
+import '../general/ArmorModule.sol';
+import '../general/BalanceExpireTracker.sol';
 import '../staking/GovernanceStaker.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
@@ -15,9 +16,10 @@ import '../interfaces/IRewardManager.sol';
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
  **/
-contract BalanceManager is ArmorModule, IBalanceManager {
+contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
 
-    using SafeMath for uint;
+    using SafeMath for uint256;
+    using SafeMath for uint128;
 
     GovernanceStaker public governanceStaker;
     
@@ -31,23 +33,22 @@ contract BalanceManager is ArmorModule, IBalanceManager {
     mapping (address => address) public referrers;
 
     // Percent of funds that go to development--start with 0 and can change.
-    uint256 public devPercent;
+    uint128 public devPercent;
 
     // Percent of funds referrers receive. 20 = 2%.
-    uint256 public refPercent;
+    uint128 public refPercent;
 
     // Percent of funds given to governance stakers.
-    uint256 public govPercent;
+    uint128 public govPercent;
 
     // Denominator used to when distributing tokens 1000 == 100%
-    uint256 public constant DENOMINATOR = 1000;
+    uint128 public constant DENOMINATOR = 1000;
 
     // With lastTime and secondPrice we can determine balance by second.
-    // Second price is in ETH so we must convert.
     struct Balance {
-        uint256 lastTime;
-        uint256 perSecondPrice;
-        uint256 lastBalance;
+        uint64 lastTime;
+        uint64 perSecondPrice;
+        uint128 lastBalance;
     }
 
     /**
@@ -58,6 +59,18 @@ contract BalanceManager is ArmorModule, IBalanceManager {
     {
         updateBalance(_user);
         _;
+        Balance memory balance = balances[_user];
+        if (balance.perSecondPrice > 0) {
+            uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
+            BalanceExpireTracker.push(uint160(_user), expiry);
+        }
+    }
+
+    function keep() external {
+        while (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
+            BalanceExpireTracker.pop(head);
+            // utilization farm subtraction here.
+        }
     }
 
     /**
@@ -92,8 +105,8 @@ contract BalanceManager is ArmorModule, IBalanceManager {
         
         require(msg.value > 0, "No Ether was deposited.");
 
-        balances[msg.sender].lastBalance = balances[msg.sender].lastBalance.add(msg.value);
-        balances[msg.sender].lastTime = block.timestamp;
+        balances[msg.sender].lastBalance = uint128(balances[msg.sender].lastBalance.add(msg.value));
+        balances[msg.sender].lastTime = uint64(block.timestamp);
         _notifyBalanceChange(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
@@ -109,14 +122,11 @@ contract BalanceManager is ArmorModule, IBalanceManager {
     update(msg.sender)
     {
         Balance memory balance = balances[msg.sender];
-        // this can be achieved by safeMath.sub
-        // require(_amount <= balance.lastBalance, "Not enough balance for withdrawal.");
 
-        balance.lastBalance = balance.lastBalance.sub(_amount);
+        balance.lastBalance = uint128( balance.lastBalance.sub(_amount) );
         balances[msg.sender] = balance;
         
         _notifyBalanceChange(msg.sender);
-        // think we can just use call.value()()
         msg.sender.transfer(_amount);
         emit Withdraw(msg.sender, _amount);
     }
@@ -163,17 +173,15 @@ contract BalanceManager is ArmorModule, IBalanceManager {
         // newBalance should never be greater than last balance.
         uint256 loss = balance.lastBalance.sub(newBalance);
     
-        _payPercents(_user, loss);
+        _payPercents(_user, uint128(loss));
 
         // Update storage balance.
-        balance.lastBalance = newBalance;
-        balance.lastTime = block.timestamp;
+        balance.lastBalance = uint128(newBalance);
+        balance.lastTime = uint64(block.timestamp);
         emit Loss(_user, loss);
         
         if(newBalance == 0) {
-            // do something when expired
-            // maybe we should set price to zero
-            // also some expiration of the plan?
+            // subtract used from U.F.
             balance.perSecondPrice = 0;
             emit PriceChange(_user, 0);
         }
@@ -186,7 +194,7 @@ contract BalanceManager is ArmorModule, IBalanceManager {
      * @param _user The user whose price we are changing.
      * @param _newPrice the new price per second that the user will be paying.
      **/
-    function changePrice(address _user, uint256 _newPrice)
+    function changePrice(address _user, uint64 _newPrice)
     external
     override
     update(_user)
@@ -227,22 +235,22 @@ contract BalanceManager is ArmorModule, IBalanceManager {
      * @param _user User that's being charged.
      * @param _charged Amount of funds charged to the user.
     **/
-    function _payPercents(address _user, uint256 _charged)
+    function _payPercents(address _user, uint128 _charged)
       internal
     {
         // percents: 20 = 2%.
-        uint256 refAmount = referrers[_user] != address(0) ? _charged * refPercent / DENOMINATOR : 0;
-        uint256 devAmount = _charged * devPercent / DENOMINATOR;
-        uint256 govAmount = _charged * govPercent / DENOMINATOR;
-        uint256 nftAmount = _charged.sub(refAmount).sub(devAmount).sub(govAmount);
+        uint128 refAmount = referrers[_user] != address(0) ? _charged * refPercent / DENOMINATOR : 0;
+        uint128 devAmount = _charged * devPercent / DENOMINATOR;
+        uint128 govAmount = _charged * govPercent / DENOMINATOR;
+        uint128 nftAmount = uint128( _charged.sub(refAmount).sub(devAmount).sub(govAmount) );
         
         if (refAmount > 0) {
-            balances[ referrers[_user] ].lastBalance = balances[ referrers[_user] ].lastBalance.add(refAmount);
+            balances[ referrers[_user] ].lastBalance = uint128( balances[ referrers[_user] ].lastBalance.add(refAmount) );
             emit AffiliatePaid(_user, referrers[_user], refAmount);
         }
-        if (devAmount > 0) balances[devWallet].lastBalance = balances[devWallet].lastBalance.add(devAmount);
-        if (govAmount > 0) balances[address(governanceStaker)].lastBalance = balances[address(governanceStaker)].lastBalance.add(govAmount);
-        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount);
+        if (devAmount > 0) balances[devWallet].lastBalance = uint128( balances[devWallet].lastBalance.add(devAmount) );
+        if (govAmount > 0) balances[address(governanceStaker)].lastBalance = uint128( balances[address(governanceStaker)].lastBalance.add(govAmount) );
+        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = uint128( balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount) );
     }
 
     function _notifyBalanceChange(address _user) 
@@ -254,7 +262,7 @@ contract BalanceManager is ArmorModule, IBalanceManager {
     /**
      * @dev Controller can change how much referrers are paid.
     **/
-    function changeRefPercent(uint256 _newPercent)
+    function changeRefPercent(uint128 _newPercent)
       external
       onlyOwner
     {
@@ -265,7 +273,7 @@ contract BalanceManager is ArmorModule, IBalanceManager {
     /**
      * @dev Controller can change how much governance is paid.
     **/
-    function changeGovPercent(uint256 _newPercent)
+    function changeGovPercent(uint128 _newPercent)
       external
       onlyOwner
     {
@@ -276,7 +284,7 @@ contract BalanceManager is ArmorModule, IBalanceManager {
     /**
      * @dev Controller can change how much developers are paid.
     **/
-    function changeDevPercent(uint256 _newPercent)
+    function changeDevPercent(uint128 _newPercent)
       external
       onlyOwner
     {

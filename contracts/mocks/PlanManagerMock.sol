@@ -13,7 +13,7 @@ contract PlanManagerMock {
   function updateExpireTime(address _user)  external {
       emit UpdateExpireTime(_user);
   }
-  function mockChangePrice(address _balanceManager, address _user, uint256 _newPrice) external {
+  function mockChangePrice(address _balanceManager, address _user, uint64 _newPrice) external {
       IBalanceManager(_balanceManager).changePrice(_user, _newPrice);
   }
   function changePrice(address _contract, uint256 _newPrice) external {

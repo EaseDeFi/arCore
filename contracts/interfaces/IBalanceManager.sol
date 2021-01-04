@@ -12,8 +12,8 @@ interface IBalanceManager {
   function deposit(address _referrer) external payable;
   function withdraw(uint256 _amount) external;
   function updateBalance(address _user) external;
-	function initialize(address _armormaster, address _devWallet) external;
-	function balanceOf(address _user) external view returns (uint256);
+  function initialize(address _armormaster, address _devWallet) external;
+  function balanceOf(address _user) external view returns (uint256);
   function perSecondPrice(address _user) external view returns(uint256);
-	function changePrice(address user, uint256 _newPricePerSec) external;
+  function changePrice(address user, uint64 _newPricePerSec) external;
 }

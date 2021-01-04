@@ -122,7 +122,9 @@ contract PlanManager is ArmorModule, IPlanManager {
         }
         
         // update balance price per second here
-        IBalanceManager(getModule("BALANCE")).changePrice(msg.sender, newPricePerSec);
+        uint64 castPricePerSec = uint64(newPricePerSec);
+        require(uint256(castPricePerSec) == newPricePerSec);
+        IBalanceManager(getModule("BALANCE")).changePrice(msg.sender, castPricePerSec);
 
         emit PlanUpdate(msg.sender, _protocols, _coverAmounts, endTime);
     }

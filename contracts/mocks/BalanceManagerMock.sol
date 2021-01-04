@@ -16,7 +16,7 @@ contract BalanceManagerMock {
     function updateExpireTime(address _planManager, address _user) external {
         _planManager.call(abi.encodeWithSignature("updateExpireTime(address)", _user));
     }
-    function changePrice(address _user, uint256 _price) external {
+    function changePrice(address _user, uint64 _price) external {
         price[_user] = _price;
         emit PriceChangedMock(_user, _price);
     }
