@@ -544,9 +544,9 @@ contract arNFTMock is
     // cannot go back to false
     bool public swapActivated;
 
-    // ock data
-    uint256 coverId__;
-    uint256 claimId__;
+    // Mock data
+    uint256 public coverId__;
+    uint256 public claimId__;
 
     mapping(uint256 => uint8) status_;
     mapping(uint256 => uint256) sumAssured_;

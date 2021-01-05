@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.6;
+import "hardhat/console.sol";
 /**
  * @title Balance Expire Traker
  * @dev Keeps track of expiration of user balances.
@@ -63,6 +64,7 @@ contract BalanceExpireTracker {
         
         uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
         if (head == EMPTY) {
+            console.log("EMPTY");
             // all the nfts are expired. so just add
             head = expireId;
             tail = expireId; 
@@ -75,9 +77,12 @@ contract BalanceExpireTracker {
         // there is active nft. we need to find where to push
         // first check if this expires faster than head
         if (infos[head].expiresAt >= expiresAt) {
+            console.log("PRIOR to HEAD");
             // pushing nft is going to expire first
             // update head
-            infos[expireId] = ExpireMetadata(EMPTY,head,expiresAt);
+            infos[head].prev = expireId;
+
+            infos[expireId] = ExpireMetadata(head, EMPTY, expiresAt);
             head = expireId;
             
             // update head of bucket
@@ -95,8 +100,12 @@ contract BalanceExpireTracker {
           
         // then check if depositing nft will last more than latest
         if (infos[tail].expiresAt <= expiresAt) {
+            console.log("LATER than TAIL");
+            infos[tail].next = expireId;
+            console.logUint(expireId);
+
             // push nft at tail
-            infos[expireId] = ExpireMetadata(tail,EMPTY,expiresAt);
+            infos[expireId] = ExpireMetadata(EMPTY,tail,expiresAt);
             tail = expireId;
             
             // update tail of bucket
@@ -113,6 +122,7 @@ contract BalanceExpireTracker {
         }
           
         // so our nft is somewhere in between
+        console.log("INBETWEEN");
         if (checkPoints[bucket].head != EMPTY) {
             //bucket is not empty
             //we just need to find our neighbor in the bucket

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
-
+import { increase } from "../utils";
 function stringToBytes32(str: string) : string {
   return ethers.utils.formatBytes32String(str);
 }
@@ -113,4 +113,64 @@ describe("BalanceManager", function () {
       expect(price.toString()).to.equal(newPrice.toString());
     });
   });
+
+  describe.only("#expiry", function () {
+    const amount = ethers.BigNumber.from("10000000000000000");
+
+    it("should expire when balance reaches 0", async function (){
+
+      // Set multiple balances so linked list has contents before and after user.
+      await balanceManager.connect(dev).deposit(await referrer.getAddress(), {value:amount});
+      let info = await balanceManager.infos(dev.getAddress());
+      console.log(info.toString());
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
+      info = await balanceManager.infos(dev.getAddress());
+      console.log(info.toString());
+      info = await balanceManager.infos(user.getAddress());
+      console.log(info.toString());
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
+      await balanceManager.connect(referrer).deposit(await referrer.getAddress(), {value:amount});
+
+      // Change price so it runs out. Referrer runs out first, then user, then dev.
+      console.log("user");
+      await planManager.mockChangePrice(balanceManager.address, await user.getAddress(),amount.div(1000));
+      info = await balanceManager.infos(user.getAddress());
+      console.log(info.toString());
+      console.log("user -> dev");
+      await planManager.mockChangePrice(balanceManager.address, await dev.getAddress(),amount.div(10000));
+      info = await balanceManager.infos(user.getAddress());
+      console.log(info.toString());
+      info = await balanceManager.infos(dev.getAddress());
+      console.log(info.toString());
+      console.log("referrer -> user -> dev");
+      await planManager.mockChangePrice(balanceManager.address, await referrer.getAddress(),amount.div(100000));
+
+      await increase(86400);
+
+      let head = await balanceManager.head();
+      let tail = await balanceManager.tail();
+      console.log("head:",head.toString())
+      console.log("tail:",tail.toString())
+
+      info = await balanceManager.infos(user.getAddress());
+      console.log(info.toString());
+      info = await balanceManager.infos(dev.getAddress());
+      console.log(info.toString());
+      info = await balanceManager.infos(referrer.getAddress());
+      console.log(info.toString());
+
+      // Connect from owner to trigger keep()
+      await balanceManager.connect(owner).deposit(await referrer.getAddress(), {value:amount});
+
+      info = await balanceManager.infos(user.getAddress());
+      console.log(info.toString());
+      info = await balanceManager.infos(dev.getAddress());
+      console.log(info.toString());
+      info = await balanceManager.infos(referrer.getAddress());
+      console.log(info.toString());
+
+    });
+  });
+
+
 });
