@@ -53,6 +53,15 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         uint128 lastBalance;
     }
 
+    // The last time a user has deposited.
+    mapping (address => uint256) public lastUserUpdate;
+    
+    // Block withdrawals within 1 hour of depositing.
+    modifier onceAnHour {
+        require(block.timestamp >= lastUserUpdate[msg.sender].add(1 hours), "You must wait an hour after your last update to withdraw.");
+        _;
+    }
+
     /**
      * @dev Call updateBalance before any action is taken by a user.
      * @param _user The user whose balance we need to update.
@@ -61,26 +70,23 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         updateBalance(_user);
         uint256 prevPerSecond = balances[_user].perSecondPrice;
+        
         _;
+        
         Balance memory balance = balances[_user];
         uint256 newPerSecond = balance.perSecondPrice;
         
-        // We don't want people to be able to deposit, update plan, then withdraw again and get U.F. rewards until the next person calls.
+        // Record update time.
+        lastUserUpdate[_user] = block.timestamp;
+        
         if (balance.perSecondPrice > 0) {
-            if (prevPerSecond - newPerSecond == 0 && balance.lastBalance.div(balance.perSecondPrice) < 1 hours && ufOn) {
-                IRewardManager(getModule("UF")).withdraw(_user, balance.perSecondPrice);
-                balances[_user].perSecondPrice = 0;
-            }
+            uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
+            BalanceExpireTracker.push(uint160(_user), expiry);
         }
         
         // No change
         if (prevPerSecond - newPerSecond == 0) {
             return;
-        }
-
-        if (balance.perSecondPrice > 0) {
-            uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
-            BalanceExpireTracker.push(uint160(_user), expiry);
         }
         
         // Either withdraw or stake depending on change in perSecondPrice.
@@ -155,6 +161,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     function withdraw(uint256 _amount)
       external
       override
+      onceAnHour
       doKeep
       update(msg.sender)
     {
