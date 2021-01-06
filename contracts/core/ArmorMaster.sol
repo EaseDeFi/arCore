@@ -6,22 +6,28 @@ import "../general/Ownable.sol";
 import "../interfaces/IArmorMaster.sol";
 import "../general/Keeper.sol";
 
+/**
+ * @dev ArmorMaster controls all jobs, address, and ownership in the Armor Core system.
+ *      It is used when contracts call each other, when contracts restrict functions to
+ *      each other, when onlyOwner functionality is needed, and when keeper functions must be run.
+ * @author Armor.fi -- Taek Lee
+**/
 contract ArmorMaster is Ownable, IArmorMaster {
     mapping(bytes32 => address) internal _modules;
-    mapping(bytes32 => Hook[]) internal _hookRecipients;
 
+    // Keys for different jobs to be run. A job correlates to an address with a keep()
+    // function, which is then called to run maintenance functions on the contract.
     bytes32[] internal _jobs;
-
-    struct Hook {
-        address recipient;
-        bytes8 sig;
-    }
 
     function initialize() external {
         Ownable.initializeOwnable();
         _modules[bytes32("MASTER")] = address(this);
     }
 
+    /**
+     * @dev Register a contract address with corresponding job key.
+     * @param _key The key that will point a job to an address.
+    **/
     function registerModule(bytes32 _key, address _module) external override onlyOwner {
         _modules[_key] = _module;
     }
@@ -30,6 +36,10 @@ contract ArmorMaster is Ownable, IArmorMaster {
         return _modules[_key];
     }
 
+    /**
+     * @dev Add a new job that correlates to a registered module.
+     * @param _key Key of the job used to point to module.
+    **/
     function addJob(bytes32 _key) external onlyOwner {
         require(_jobs.length < 3, "cannot have more than 3 jobs");
         require(_modules[_key] != address(0), "module is not listed");
@@ -50,7 +60,10 @@ contract ArmorMaster is Ownable, IArmorMaster {
         revert("job not found");
     }
 
-    //anyone can call this function
+    /**
+     * @dev Anyone can call keep to run jobs in this system that need to be periodically done.
+     *      To begin with, these jobs including expiring plans and expiring NFTs.
+    **/
     function keep() external override {
         for(uint256 i = 0; i < _jobs.length; i++) {
             IKeeperRecipient(_modules[_jobs[i]]).keep();

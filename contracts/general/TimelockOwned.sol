@@ -25,6 +25,9 @@ contract TimelockOwned is Ownable {
     // Mapping of proposal ID => proposal struct.
     mapping (uint256 => Proposal) proposals;
 
+    /**
+     * @dev External execution.
+    **/
     function implementProposal(uint256 _id)
       external
       onlyOwner
@@ -44,10 +47,17 @@ contract TimelockOwned is Ownable {
         proposals[id] = proposal;
     }
     
+    function deleteProposal(uint256 _id)
+      external
+      onlyOwner
+    {
+        delete proposals[_id];
+    }
+    
     function executeProposal(address _target, bytes memory _data)
       internal
     {
-        (bool success, bytes memory ret) = _target.call{value: 0}(_data);
+        (bool success, ) = _target.call{value: 0}(_data);
         require(success, "Failed to execute proposal");
     }
     

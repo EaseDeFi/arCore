@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/Ownable.sol';
+import '../general/ArmorModule.sol';
 import '../general/TokenWrapper.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
@@ -33,7 +33,7 @@ import '../interfaces/IRewardDistributionRecipient.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient {
+contract GovernanceStaker is TokenWrapper, ArmorModule, IRewardDistributionRecipient {
     IERC20 public rewardToken;
     address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
@@ -65,17 +65,16 @@ contract GovernanceStaker is TokenWrapper, Ownable, IRewardDistributionRecipient
         _;
     }
 
-    constructor(address _stakeToken, address _rewardToken)
+    constructor(address _stakeToken, address _rewardToken, address _armorMaster)
       public
     {
-        Ownable.initializeOwnable();
+        ArmorModule.initializeModule(_armorMaster);
         stakeToken = IERC20(_stakeToken);
         rewardToken = IERC20(_rewardToken);
     }
     
     function setRewardDistribution(address _rewardDistribution)
         external
-        override
         onlyOwner
     {
         rewardDistribution = _rewardDistribution;

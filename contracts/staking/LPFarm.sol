@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/Ownable.sol';
+import '../general/ArmorModule.sol';
 import '../general/TokenWrapper.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
@@ -33,7 +33,7 @@ import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract LPFarm is TokenWrapper, Ownable, IRewardDistributionRecipientTokenOnly {
+contract LPFarm is TokenWrapper, ArmorModule, IRewardDistributionRecipientTokenOnly {
     IERC20 public rewardToken;
     address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
@@ -65,10 +65,10 @@ contract LPFarm is TokenWrapper, Ownable, IRewardDistributionRecipientTokenOnly 
         _;
     }
 
-    constructor(address _stakeToken, address _rewardToken)
+    constructor(address _stakeToken, address _rewardToken, address _armorMaster)
       public
     {
-        Ownable.initializeOwnable();
+        ArmorModule.initializeModule(_armorMaster);
         stakeToken = IERC20(_stakeToken);
         rewardToken = IERC20(_rewardToken);
     }

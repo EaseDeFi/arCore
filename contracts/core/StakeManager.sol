@@ -2,10 +2,8 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/Ownable.sol';
 import '../general/ExpireTracker.sol';
 import '../general/ArmorModule.sol';
-import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
@@ -22,6 +20,9 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     using SafeMath for uint;
     
     bytes4 public constant ETH_SIG = bytes4(0x45544800);
+    
+    // Whether or not utilization farming is on.
+    bool ufOn;
     
     // Amount of time--in seconds--a user must wait to withdraw an NFT.
     uint256 withdrawalDelay;
@@ -65,11 +66,20 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         initializeModule(_armorMaster);
         // Let's be explicit. Testnet will have 0 to easily adjust stakers.
         withdrawalDelay = 0;
+        ufOn = true;
     }
 
+    /**
+     * @dev Keep function can be called by anyone to remove any NFTs that have expired. Also run when calling many functions.
+     *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
+    **/
     function keep() external {
-        while(infos[head].expiresAt !=0 && infos[head].expiresAt <= now){
-            _removeExpiredNft(head);
+        // Restrict each keep to 3 removals max.
+        for (uint256 i = 0; i < 3; i++) {
+            
+            if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
+            else return;
+            
         }
     }
     
@@ -98,41 +108,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
             _stake(_nftIds[i], msg.sender);
         }
     }
-    
-    /**
-     * @dev removeExpiredNft is called on many different interactions to the system overall.
-     * @param _nftId The ID of the expired NFT.
-    **/
-    function _removeExpiredNft(uint256 _nftId)
-      internal
-    {
-        (/*coverId*/, uint8 status, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, /*valid until*/, /*address scAddress*/, 
-         /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
-        address user = nftOwners[_nftId];
-        // changed to get status instead of validUntil
-        // require(status == uint8(3), "NFT is not expired.");
-        _removeNft(_nftId);
-        emit ExpiredNFT(user, _nftId);
-    }
-
-    function _removeNft(uint256 _nftId)
-      internal
-    {
-        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, uint256 validuntil, address scAddress, 
-         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
-        address user = nftOwners[_nftId];
-        require(user != address(0), "NFT does not belong here.");
-
-        ExpireTracker.pop(uint96(_nftId));
-        //TODO add functionality to remove by nft id in nftstorage
-        
-        uint256 weiSumAssured = sumAssured * (10 ** 18);
-        uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
-        _subtractCovers(user, _nftId, weiSumAssured, secondPrice, scAddress);
-        
-        // Returns the caller some gas as well as ensure this function cannot be called again.
-        delete nftOwners[_nftId];
-    }
 
     /**
      * @dev A user may call to withdraw their NFT. This may have a delay added to it.
@@ -157,6 +132,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         
         _removeNft(_nftId);
         IClaimManager(getModule("CLAIM")).transferNft(msg.sender, _nftId);
+        delete pendingWithdrawals[_nftId];
     }
 
     /**
@@ -219,14 +195,54 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         uint256 weiSumAssured = sumAssured * (10 ** 18);
         _addCovers(_user, weiSumAssured, secondPrice, scAddress);
         
+        // Add to utilization farming.
+        if (ufOn) IRewardManager(getModule("UF")).stake(_user, secondPrice);
+        
         emit StakedNFT(_user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
+    }
+    
+    /**
+     * @dev removeExpiredNft is called on many different interactions to the system overall.
+     * @param _nftId The ID of the expired NFT.
+    **/
+    function _removeExpiredNft(uint256 _nftId)
+      internal
+    {
+        address user = nftOwners[_nftId];
+        _removeNft(_nftId);
+        emit ExpiredNFT(user, _nftId);
+    }
+
+    /**
+     * @dev Internal main removal functionality.
+    **/
+    function _removeNft(uint256 _nftId)
+      internal
+    {
+        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, /*uint256 validuntil*/, address scAddress, 
+         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+        address user = nftOwners[_nftId];
+        require(user != address(0), "NFT does not belong here.");
+
+        ExpireTracker.pop(uint96(_nftId));
+
+        uint256 weiSumAssured = sumAssured * (10 ** 18);
+        uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
+        _subtractCovers(user, _nftId, weiSumAssured, secondPrice, scAddress);
+        
+        // Exit from utilization farming.
+        if (ufOn) IRewardManager(getModule("UF")).withdraw(user, secondPrice);
+
+        // Returns the caller some gas as well as ensure this function cannot be called again.
+        delete nftOwners[_nftId];
     }
     
     /**
      * @dev Add to the cover amount for the user and contract overall.
      * @param _user The user who submitted.
      * @param _coverAmount The amount of cover being added.
-     * @notice this must be changed for users to add cover price rather than amount
+     * @param _coverPrice Price paid by the user for the NFT per second.
+     * @param _protocol Address of the protocol that is having cover added.
     **/
     function _addCovers(address _user, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
@@ -240,7 +256,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
      * @param _user The user who is having the token removed.
      * @param _nftId ID of the NFT being used--must check if it has been submitted.
      * @param _coverAmount The amount of cover being removed.
-     * @param _coverPrice Price that the user was getting paid.
+     * @param _coverPrice Price that the user was paying per second.
      * @param _protocol The protocol that this NFT protected.
     **/
     function _subtractCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
@@ -295,5 +311,15 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       onlyOwner
     {
         withdrawalDelay = _withdrawalDelay;
+    }
+    
+    /**
+     * @dev Toggle whether utilization farming should be on or off.
+    **/
+    function toggleUF()
+      external
+      onlyOwner
+    {
+        ufOn = !ufOn;
     }
 }

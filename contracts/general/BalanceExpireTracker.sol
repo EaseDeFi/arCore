@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.6;
-import "hardhat/console.sol";
+
+import '../libraries/SafeMath.sol';
+
 /**
  * @title Balance Expire Traker
  * @dev Keeps track of expiration of user balances.
 **/
 contract BalanceExpireTracker {
+    
+    using SafeMath for uint64;
+    using SafeMath for uint256;
     
     // Don't want to keep typing address(0). Typecasting just for clarity.
     uint160 private constant EMPTY = uint160(address(0));
@@ -50,9 +55,6 @@ contract BalanceExpireTracker {
         return false;
     }
 
-    /**
-     * @notice Let's add SafeMath to this
-    **/
     // using typecasted expireId to save gas
     function push(uint160 expireId, uint64 expiresAt) 
       internal 
@@ -62,9 +64,8 @@ contract BalanceExpireTracker {
         // If this is a replacement for a current balance, remove it's current link first.
         if (infos[expireId].expiresAt > 0) _remove(expireId);
         
-        uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
+        uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         if (head == EMPTY) {
-            console.log("EMPTY");
             // all the nfts are expired. so just add
             head = expireId;
             tail = expireId; 
@@ -77,7 +78,6 @@ contract BalanceExpireTracker {
         // there is active nft. we need to find where to push
         // first check if this expires faster than head
         if (infos[head].expiresAt >= expiresAt) {
-            console.log("PRIOR to HEAD");
             // pushing nft is going to expire first
             // update head
             infos[head].prev = expireId;
@@ -100,9 +100,7 @@ contract BalanceExpireTracker {
           
         // then check if depositing nft will last more than latest
         if (infos[tail].expiresAt <= expiresAt) {
-            console.log("LATER than TAIL");
             infos[tail].next = expireId;
-            console.logUint(expireId);
 
             // push nft at tail
             infos[expireId] = ExpireMetadata(EMPTY,tail,expiresAt);
@@ -122,7 +120,6 @@ contract BalanceExpireTracker {
         }
           
         // so our nft is somewhere in between
-        console.log("INBETWEEN");
         if (checkPoints[bucket].head != EMPTY) {
             //bucket is not empty
             //we just need to find our neighbor in the bucket
@@ -151,10 +148,10 @@ contract BalanceExpireTracker {
             //bucket is empty
             //should find which bucket has depositing nft's closest neighbor
             // step 1 find prev bucket
-            uint64 prevCursor = bucket - BUCKET_STEP;
+            uint64 prevCursor = uint64( bucket.sub(BUCKET_STEP) );
             
             while(checkPoints[prevCursor].tail != EMPTY){
-              prevCursor -= BUCKET_STEP;
+              prevCursor = uint64( prevCursor.sub(BUCKET_STEP) );
             }
     
             uint160 prev = checkPoints[prevCursor].tail;
@@ -172,7 +169,7 @@ contract BalanceExpireTracker {
 
     function pop(uint160 expireId) internal {
         uint64 expiresAt = infos[expireId].expiresAt;
-        uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
+        uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         // check if bucket is empty
         // if bucket is empty, reverts
         require(checkPoints[bucket].head != EMPTY, "Info does not exist: Bucket empty");
@@ -194,7 +191,7 @@ contract BalanceExpireTracker {
                 // if cursor was head of bucket
                 if(checkPoints[bucket].head == cursor){
                     // and cursor.next is still in same bucket, move head to cursor.next
-                    if(infos[info.next].expiresAt / BUCKET_STEP == bucket / BUCKET_STEP){
+                    if(infos[info.next].expiresAt.div(BUCKET_STEP) == bucket.div(BUCKET_STEP)){
                         checkPoints[bucket].head == info.next;
                     } else {
                         // delete whole checkpoint if bucket is now empty

@@ -5,8 +5,6 @@ pragma solidity ^0.6.6;
 import '../general/Keeper.sol';
 import '../general/ArmorModule.sol';
 import '../general/BalanceExpireTracker.sol';
-import '../staking/GovernanceStaker.sol';
-import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
@@ -21,7 +19,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     using SafeMath for uint256;
     using SafeMath for uint128;
 
-    GovernanceStaker public governanceStaker;
+    // Only thing we use is notifyRewardAmount so make it IRewardManager instead of a GovernanaceStaker contract.
+    IRewardManager public governanceStaker;
     
     // Wallet of the developers for if a developer fee is being paid.
     address public devWallet;
@@ -44,6 +43,9 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     // Denominator used to when distributing tokens 1000 == 100%
     uint128 public constant DENOMINATOR = 1000;
 
+    // True if utilization farming is still ongoing
+    bool public ufOn;
+
     // With lastTime and secondPrice we can determine balance by second.
     struct Balance {
         uint64 lastTime;
@@ -58,18 +60,42 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     modifier update(address _user)
     {
         updateBalance(_user);
+        uint256 prevPerSecond = balances[_user].perSecondPrice;
         _;
         Balance memory balance = balances[_user];
-        if (balance.perSecondPrice > 0) {
-            uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
-            BalanceExpireTracker.push(uint160(_user), expiry);
+        uint256 newPerSecond = balance.perSecondPrice;
+
+        // No changes necessary.
+        if (prevPerSecond - newPerSecond == 0) {
+            return;
         }
+
+        uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
+        BalanceExpireTracker.push(uint160(_user), expiry);
+        
+        // Either withdraw or stake depending on change in perSecondPrice.
+        if (newPerSecond > prevPerSecond && ufOn) IRewardManager(getModule("UF")).stake(_user, newPerSecond.sub(prevPerSecond));
+        else if (ufOn) IRewardManager(getModule("UF")).withdraw(_user, prevPerSecond.sub(newPerSecond));
     }
 
+    /**
+     * @dev Keep function can be called by anyone to balances that have been expired. This pays out addresses and removes used cover.
+     *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
+    **/
     function keep() external {
-        while (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
-            BalanceExpireTracker.pop(head);
-            // utilization farm subtraction here.
+        // Restrict each keep to 3 removes max.
+        for (uint256 i = 0; i < 3; i++) {
+        
+            if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
+                BalanceExpireTracker.pop(head);
+                
+                if (ufOn) IRewardManager(getModule("UF")).withdraw(address(head), balances[address(head)].perSecondPrice);
+                balances[address(head)].perSecondPrice = 0;
+        
+                // Remove borrowed amount from PlanManager.        
+                _notifyBalanceChange(msg.sender);
+            } else return;
+            
         }
     }
 
@@ -84,7 +110,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         devWallet = _devWallet;
         devPercent = 0;     // 0 %
         refPercent = 25;    // 2.5%
-        govPercent = 25;    // 2.5%
+        govPercent = 0;     // 0%
+        ufOn = true;
     }
 
     /**
@@ -92,11 +119,11 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      * @param _referrer User who referred the depositor.
      **/
     function deposit(address _referrer) 
-    external
-    payable
-    override
-    update(msg.sender)
-    doKeep
+      external
+      payable
+      override
+      doKeep
+      update(msg.sender)
     {
         if ( referrers[msg.sender] == address(0) ) {
             referrers[msg.sender] = _referrer != address(0) ? _referrer : devWallet;
@@ -116,10 +143,10 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      * @param _amount The amount of Dai to withdraw.
      **/
     function withdraw(uint256 _amount)
-    external
-    doKeep
-    override
-    update(msg.sender)
+      external
+      override
+      doKeep
+      update(msg.sender)
     {
         Balance memory balance = balances[msg.sender];
 
@@ -136,9 +163,9 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      * @param _user The user whose balance to find.
      **/
     function balanceOf(address _user)
-    public
-    view
-    override
+      public
+      view
+      override
     returns (uint256)
     {
         Balance memory balance = balances[_user];
@@ -162,8 +189,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      * @param _user The address to be updated.
      **/
     function updateBalance(address _user)
-    public
-    override
+      public
+      override
     {
         Balance memory balance = balances[_user];
 
@@ -181,7 +208,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         emit Loss(_user, loss);
         
         if(newBalance == 0) {
-            // subtract used from U.F.
             balance.perSecondPrice = 0;
             emit PriceChange(_user, 0);
         }
@@ -195,9 +221,9 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      * @param _newPrice the new price per second that the user will be paying.
      **/
     function changePrice(address _user, uint64 _newPrice)
-    external
-    override
-    update(_user)
+      external
+      override
+      update(_user)
     {
         require(msg.sender == getModule("PLAN"), "Caller is not PlanManager.");
         balances[_user].perSecondPrice = _newPrice;
@@ -215,15 +241,16 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
        
        uint256 rewardBalance = balances[getModule("REWARD")].lastBalance;
        balances[getModule("REWARD")].lastBalance = 0;
-
-       governanceStaker.notifyRewardAmount{value: govBalance}(govBalance);
-       IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
+        
+       // If staking contracts are sent too low of a reward, it can mess up distribution.
+       if (govBalance > 1 ether) governanceStaker.notifyRewardAmount{value: govBalance}(govBalance);
+       if (rewardBalance > 1 ether) IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
     }
 
     function perSecondPrice(address _user)
-    external
-    override
-    view
+      external
+      override
+      view
     returns(uint256)
     {
         Balance memory balance = balances[_user];
@@ -253,14 +280,18 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = uint128( balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount) );
     }
 
+    /**
+     * @dev Balance has changed so PlanManager's expire time must be either increased or reduced.
+    **/
     function _notifyBalanceChange(address _user) 
-    internal
+      internal
     {
         IPlanManager(getModule("PLAN")).updateExpireTime(_user); 
     }
     
     /**
      * @dev Controller can change how much referrers are paid.
+     * @param _newPercent New percent referrals receive from revenue. 100 == 10%.
     **/
     function changeRefPercent(uint128 _newPercent)
       external
@@ -272,6 +303,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     
     /**
      * @dev Controller can change how much governance is paid.
+     * @param _newPercent New percent that governance will receive from revenue. 100 == 10%.
     **/
     function changeGovPercent(uint128 _newPercent)
       external
@@ -283,6 +315,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     
     /**
      * @dev Controller can change how much developers are paid.
+     * @param _newPercent New percent that devs will receive from revenue. 100 == 10%.
     **/
     function changeDevPercent(uint128 _newPercent)
       external
@@ -290,5 +323,15 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         require(_newPercent <= DENOMINATOR, "new percent cannot be bigger than DENOMINATOR");
         devPercent = _newPercent;
+    }
+    
+    /**
+     * @dev Toggle whether utilization farming should be on or off.
+    **/
+    function toggleUF()
+      external
+      onlyOwner
+    {
+        ufOn = !ufOn;
     }
 }

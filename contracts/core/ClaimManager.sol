@@ -90,8 +90,9 @@ contract ClaimManager is ArmorModule, IClaimManager {
         require(generationTime <= _hackTime, "arNFT had not been purchased before hack.");
 
         // Subtract amount it was protecting from total staked for the protocol if it is not expired (in which case it already has been subtracted).
-        uint256 weiSumAssured = sumAssured * (10 ** 18);
+        uint256 weiSumAssured = sumAssured * (1e18);
         if (status != 3) IStakeManager(getModule("STAKE")).subtractTotal(_nftId, scAddress, weiSumAssured);
+        // subtract balance here
 
         IarNFT(getModule("ARNFT")).submitClaim(_nftId);
     }
@@ -105,7 +106,6 @@ contract ClaimManager is ArmorModule, IClaimManager {
       external
       doKeep
     {
-        //TODO: decrease total covered amount
         IarNFT(getModule("ARNFT")).redeemClaim(_nftId);
     }
     

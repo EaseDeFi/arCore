@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.6;
+
+import '../libraries/SafeMath.sol';
+
 /**
  * @title Expire Traker
- * @dev Keeps track of expirement
+ * @dev Keeps track of expired NFTs.
 **/
 contract ExpireTracker {
+    
+    using SafeMath for uint64;
+    using SafeMath for uint256;
+
     // 1 day for each step.
     uint64 public constant BUCKET_STEP = 86400;
 
@@ -33,7 +40,7 @@ contract ExpireTracker {
         uint64 expiresAt;
     }
 
-    function expired() internal returns(bool){
+    function expired() internal view returns(bool) {
         if(infos[head].expiresAt == 0) {
             return false;
         }
@@ -45,15 +52,12 @@ contract ExpireTracker {
         return false;
     }
 
-    /**
-     * @notice Let's add SafeMath to this
-    **/
     // using typecasted expireId to save gas
     function push(uint96 expireId, uint64 expiresAt) 
       internal 
     {
         require(expireId != 0, "info id 0 cannot be supported");
-        uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
+        uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         if (head == 0) {
             // all the nfts are expired. so just add
             head = expireId;
@@ -136,7 +140,7 @@ contract ExpireTracker {
             uint64 prevCursor = bucket - BUCKET_STEP;
             
             while(checkPoints[prevCursor].tail != 0){
-              prevCursor -= BUCKET_STEP;
+              prevCursor = uint64( prevCursor.sub(BUCKET_STEP) );
             }
     
             uint96 prev = checkPoints[prevCursor].tail;
@@ -154,7 +158,7 @@ contract ExpireTracker {
 
     function pop(uint96 expireId) internal {
         uint64 expiresAt = infos[expireId].expiresAt;
-        uint64 bucket = (expiresAt / BUCKET_STEP) * BUCKET_STEP;
+        uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         // check if bucket is empty
         // if bucket is empty, reverts
         require(checkPoints[bucket].head != 0, "Info does not exist:Bucket empty");
@@ -176,7 +180,7 @@ contract ExpireTracker {
                 // if cursor was head of bucket
                 if(checkPoints[bucket].head == cursor){
                     // and cursor.next is still in same bucket, move head to cursor.next
-                    if(infos[info.next].expiresAt / BUCKET_STEP == bucket / BUCKET_STEP){
+                    if(infos[info.next].expiresAt.div(BUCKET_STEP) == bucket.div(BUCKET_STEP)) {
                         checkPoints[bucket].head == info.next;
                     } else {
                         // delete whole checkpoint if bucket is now empty

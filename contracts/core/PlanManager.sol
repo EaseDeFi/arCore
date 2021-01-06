@@ -52,7 +52,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         initializeModule(_armorMaster);
         markup = 150;
     }
-
+    
     function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end){
         if(plans[_user].length == 0){
             return(0,0);
@@ -87,7 +87,7 @@ contract PlanManager is ArmorModule, IPlanManager {
           // First go through and subtract all old cover amounts.
           _removeLatestTotals(msg.sender);
           
-          // Set current plan to have ended now.
+          // Set current plan to have ended now or when it ended previously.
           lastPlan.endTime = lastPlan.endTime <= now ? lastPlan.endTime : uint64(now);
         }
 
@@ -105,10 +105,10 @@ contract PlanManager is ArmorModule, IPlanManager {
         }
 
         //newPricePerSec = newPricePerSec * _markup / 1e18 for decimals / 100 to make up for markup (200 == 200%);
-        newPricePerSec = newPricePerSec * _markup / (10**18) / 100;
+        newPricePerSec = newPricePerSec.mul(_markup).div(1e18).div(100);
 
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
-        uint256 endTime = balance / newPricePerSec + now;
+        uint256 endTime = balance.div(newPricePerSec).add(block.timestamp);
         
         //add plan
         Plan memory newPlan;
@@ -131,6 +131,7 @@ contract PlanManager is ArmorModule, IPlanManager {
 
     /**
      * @dev Update the contract-wide totals for each protocol that has changed.
+     * @param _user User whose plan is updating these totals.
     **/
     function _removeLatestTotals(address _user) internal{
         Plan storage plan = plans[_user][plans[_user].length - 1];
@@ -145,6 +146,11 @@ contract PlanManager is ArmorModule, IPlanManager {
         }
     }
 
+    /**
+     * @dev Add new totals for new protocol/cover amounts.
+     * @param _newProtocols Protocols that are being borrowed for.
+     * @param _newCoverAmounts Cover amounts (in Wei) that are being borrowed.
+    **/
     function _addNewTotals(address[] memory _newProtocols, uint256[] memory _newCoverAmounts) internal {
         for (uint256 i = 0; i < _newProtocols.length; i++) {
             totalUsedCover[_newProtocols[i]] = totalUsedCover[_newProtocols[i]].add(_newCoverAmounts[i]);
@@ -153,10 +159,14 @@ contract PlanManager is ArmorModule, IPlanManager {
         }
     }
 
+    /**
+     * @dev Determine the amount of coverage left for a specific protocol.
+     * @param _protocol The address of the protocol we're determining coverage left for.
+    **/
     function coverageLeft(address _protocol)
-        external
-        override
-        view
+      external
+      override
+      view
     returns(uint256) {
         uint256 stakedAmount = IStakeManager(getModule("STAKE")).totalStakedAmount(_protocol);
         uint256 used = totalUsedCover[_protocol];
@@ -189,7 +199,6 @@ contract PlanManager is ArmorModule, IPlanManager {
             Plan storage plan = planArray[uint256(i)];
             // Only one plan will be active at the time of a hack--return cover amount from then.
             if (_hackTime >= plan.startTime && _hackTime < plan.endTime) {
-                //typecast -- is it safe?
                 for(uint256 j = 0; j<= plan.length; j++){
                     bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,i,j));
                     if(IStakeManager(getModule("STAKE")).protocolAddress(protocolPlan[key].protocolId) == _protocol){
@@ -202,11 +211,24 @@ contract PlanManager is ArmorModule, IPlanManager {
         return (uint256(-1), false);
     }
 
+    /**
+     * @dev ClaimManager redeems the plan if it has been claimed. Sets claim amount to 0 so it cannot be claimed again.
+     * @param _user User that is redeeming this plan.
+     * @param _planIndex The index in the user's Plan array that we're checking.
+     * @param _protocol Address of the protocol that a claim is being redeemed for.
+    **/
     function planRedeemed(address _user, uint256 _planIndex, address _protocol) external override onlyModule("CLAIM"){
         Plan storage plan = plans[_user][_planIndex];
         require(plan.endTime < now, "Cannot redeem active plan, update plan to redeem properly");
-        //plan.claimed[_protocol] = true;
-        //TODO reduce cover amount of plan
+
+        for (uint256 i = 0; i < plan.length; i++) {
+            bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,_planIndex,i));
+            
+            ProtocolPlan memory protocol = protocolPlan[key];
+            address protocolAddress = IStakeManager(getModule("STAKE")).protocolAddress(protocol.protocolId);
+            
+            if (protocolAddress == _protocol) protocolPlan[key].amount = 0;
+        }
     }
 
     /**
@@ -222,6 +244,10 @@ contract PlanManager is ArmorModule, IPlanManager {
         nftCoverPrice[_protocol] = _newPrice;
     }
 
+    /**
+     * @dev BalanceManager calls to update expire time of a plan when a deposit/withdrawal happens.
+     * @param _user Address whose balance was updated.
+    **/
     function updateExpireTime(address _user)
       external
       override

@@ -3,7 +3,6 @@
 pragma solidity ^0.6.6;
 
 import '../general/ArmorModule.sol';
-import '../general/Ownable.sol';
 import '../general/SafeERC20.sol';
 import '../general/BalanceWrapper.sol';
 import '../libraries/Math.sol';
@@ -46,7 +45,6 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
     // Reward token is 0 if Ether is the reward.
     IERC20 public rewardToken;
     address public stakeManager;
-    address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
 
     uint256 public periodFinish = 0;
@@ -71,27 +69,13 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
         _;
     }
 
-    modifier onlyRewardDistribution() {
-        require(msg.sender == rewardDistribution, "Caller is not reward distribution");
-        _;
-    }
-
-    function initialize(address _armorMaster, address _rewardToken, address _rewardDistribution)
+    function initialize(address _armorMaster, address _rewardToken)
       external
       override
     {
         require(address(stakeManager) == address(0), "Contract is already initialized.");
         initializeModule(_armorMaster);
         rewardToken = IERC20(_rewardToken);
-        rewardDistribution = _rewardDistribution;
-    }
-    
-    function setRewardDistribution(address _rewardDistribution)
-        external
-        override
-        onlyOwner
-    {
-        rewardDistribution = _rewardDistribution;
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
@@ -131,11 +115,6 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
         emit BalanceWithdrawn(user, amount);
     }
 
-    function exit(address payable user) external override {
-        withdraw(user, balanceOf(user));
-        getReward(user);
-    }
-
     function getReward(address payable user) public override updateReward(user) doKeep {
         uint256 reward = earned(user);
         if (reward > 0) {
@@ -152,7 +131,7 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
         external
         payable
         override
-        onlyRewardDistribution
+        onlyModule("BALANCE")
         updateReward(address(0))
     {
         //this will make sure tokens are in the reward pool

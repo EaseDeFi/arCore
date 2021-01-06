@@ -2,11 +2,9 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/Ownable.sol';
 import '../general/SafeERC20.sol';
 import '../general/BalanceWrapper.sol';
 import '../general/ArmorModule.sol';
-import '../general/ExpireTracker.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
@@ -41,7 +39,7 @@ import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract UtilizationFarm is ArmorModule, BalanceWrapper, ExpireTracker, IRewardDistributionRecipientTokenOnly {
+contract UtilizationFarm is ArmorModule, BalanceWrapper, IRewardDistributionRecipientTokenOnly {
     using SafeERC20 for IERC20;
 
     IERC20 public rewardToken;
@@ -60,7 +58,8 @@ contract UtilizationFarm is ArmorModule, BalanceWrapper, ExpireTracker, IRewardD
 
     event RewardAdded(uint256 reward);
     event RewardPaid(address indexed user, uint256 reward);
-    event Subscribed(address indexed user, uint256 amount, uint256 expiresAt);
+    event BalanceAdded(address indexed user, uint256 amount);
+    event BalanceWithdrawn(address indexed user, uint256 amount);
 
     modifier updateReward(address account) {
         rewardPerTokenStored = rewardPerToken();
@@ -119,47 +118,28 @@ contract UtilizationFarm is ArmorModule, BalanceWrapper, ExpireTracker, IRewardD
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address user, uint256 amount) public {
-        revert("cannot stake");
-    }
-    
-    function withdraw(address user, uint256 amount) public {
-        revert("cannot withdraw");
-    }
-
-    function exit() external {
-        revert("cannot exit");
-    }
-    
-    // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function subscribed(address user, uint256 amount, uint256 expiresAt) public updateReward(user) onlyModule("BALANCE"){
-        _removeStake(user, balanceOf(user));
+    function stake(address user, uint256 amount) external onlyModules("BALANCE","STAKE") updateReward(user) {
         _addStake(user, amount);
-        _updateExpiry(user, expiresAt);
-        emit Subscribed(user, amount, expiresAt);
+        emit BalanceAdded(user, amount);
     }
 
-    function _updateExpiry(address user, uint256 expiresAt) internal {
-        if(expiryId[user] != 0){
-            uint96 expireId = expiryId[user];
-            ExpireTracker.pop(expireId);
-            ExpireTracker.push(expireId, uint64(expiresAt));
-        } else {
-            uint96 expireId = uint96(++expiryCount);
-            ExpireTracker.push(expireId, uint64(expiresAt));
-            expiryId[user] = expireId;
-        }
+    function withdraw(address user, uint256 amount) public onlyModules("BALANCE","STAKE") updateReward(user) {
+        _removeStake(user, amount);
+        emit BalanceWithdrawn(user, amount);
     }
 
-    function getReward() public updateReward(msg.sender) {
-        uint256 reward = earned(msg.sender);
+    function getReward(address payable user) public updateReward(user) doKeep {
+        uint256 reward = earned(user);
         if (reward > 0) {
-            rewards[msg.sender] = 0;
-            rewardToken.safeTransfer(msg.sender, reward);
-            emit RewardPaid(msg.sender, reward);
+            rewards[user] = 0;
+            
+            if ( address(rewardToken) == address(0) ) user.transfer(reward);
+            else rewardToken.safeTransfer(user, reward);
+            
+            emit RewardPaid(user, reward);
         }
     }
-
+    
     function notifyRewardAmount(uint256 reward)
         external
         override

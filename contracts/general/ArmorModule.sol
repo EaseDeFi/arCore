@@ -5,6 +5,10 @@ pragma solidity ^0.6.0;
 import "../interfaces/IArmorMaster.sol";
 import "./Ownable.sol";
 import "./Bytes32.sol";
+
+/**
+ * @dev Each arCore contract is a module to enable simple communication and interoperability. ArmorMaster.sol is master.
+**/
 contract ArmorModule {
     IArmorMaster internal _master;
 
@@ -23,6 +27,15 @@ contract ArmorModule {
     modifier onlyModule(bytes32 _module) {
         string memory message = string(abi.encodePacked("only module ", _module.toString()," can call this function"));
         require(msg.sender == getModule(_module), message);
+        _;
+    }
+
+    /**
+     * @dev Used when multiple can call.
+    **/
+    modifier onlyModules(bytes32 _moduleOne, bytes32 _moduleTwo) {
+        string memory message = string(abi.encodePacked("only module ", _moduleOne.toString()," or ", _moduleTwo.toString()," can call this function"));
+        require(msg.sender == getModule(_moduleOne) || msg.sender == getModule(_moduleTwo), message);
         _;
     }
 

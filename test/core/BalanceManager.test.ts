@@ -12,6 +12,7 @@ describe("BalanceManager", function () {
   let planManager: Contract;
   let rewardManager: Contract;
   let governanceStaker: Contract;
+  let utilizationFarm: Contract;
   let token: Contract;
   let owner: Signer;
   let user: Signer;
@@ -32,6 +33,7 @@ describe("BalanceManager", function () {
     balanceManager = await BalanceFactory.deploy();
     await balanceManager.initialize(master.address, await dev.getAddress());
     await master.connect(owner).registerModule(stringToBytes32("BALANCE"), balanceManager.address);
+    await master.connect(owner).addJob(stringToBytes32("BALANCE"));
 
     const PlanFactory = await ethers.getContractFactory("PlanManagerMock");
     planManager = await PlanFactory.deploy();
@@ -46,8 +48,13 @@ describe("BalanceManager", function () {
     await master.connect(owner).registerModule(stringToBytes32("REWARD"), rewardManager.address);
 
     const GovernanceStakerFactory = await ethers.getContractFactory("GovernanceStaker");
-    governanceStaker = await GovernanceStakerFactory.deploy(token.address, constants.AddressZero);
-    await rewardManager.initialize(master.address, await user.getAddress(), balanceManager.address);
+    governanceStaker = await GovernanceStakerFactory.deploy(token.address, constants.AddressZero, master.address);
+    await rewardManager.initialize(master.address, constants.AddressZero);
+
+    const UtilizationFarm = await ethers.getContractFactory("UtilizationFarm");
+    utilizationFarm = await UtilizationFarm.deploy();
+    await utilizationFarm.initialize(token.address, master.address);
+    await master.connect(owner).registerModule(stringToBytes32("UF"), utilizationFarm.address);
   });
 
   describe("#initialize()", function() {
