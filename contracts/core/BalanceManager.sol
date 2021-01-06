@@ -64,14 +64,24 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         _;
         Balance memory balance = balances[_user];
         uint256 newPerSecond = balance.perSecondPrice;
-
-        // No changes necessary.
+        
+        // We don't want people to be able to deposit, update plan, then withdraw again and get U.F. rewards until the next person calls.
+        if (balance.perSecondPrice > 0) {
+            if (prevPerSecond - newPerSecond == 0 && balance.lastBalance.div(balance.perSecondPrice) < 1 hours && ufOn) {
+                IRewardManager(getModule("UF")).withdraw(_user, balance.perSecondPrice);
+                balances[_user].perSecondPrice = 0;
+            }
+        }
+        
+        // No change
         if (prevPerSecond - newPerSecond == 0) {
             return;
         }
 
-        uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
-        BalanceExpireTracker.push(uint160(_user), expiry);
+        if (balance.perSecondPrice > 0) {
+            uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
+            BalanceExpireTracker.push(uint160(_user), expiry);
+        }
         
         // Either withdraw or stake depending on change in perSecondPrice.
         if (newPerSecond > prevPerSecond && ufOn) IRewardManager(getModule("UF")).stake(_user, newPerSecond.sub(prevPerSecond));
@@ -150,9 +160,15 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         Balance memory balance = balances[msg.sender];
 
-        balance.lastBalance = uint128( balance.lastBalance.sub(_amount) );
-        balances[msg.sender] = balance;
+        // Since cost increases per second, it's difficult to estimate the correct amount. Withdraw it all in that case.
+        if (balance.lastBalance > _amount) {
+            balance.lastBalance = uint128( balance.lastBalance.sub(_amount) );
+        } else {
+            _amount = balance.lastBalance;
+            balance.lastBalance = 0;
+        }
         
+        balances[msg.sender] = balance;
         _notifyBalanceChange(msg.sender);
         msg.sender.transfer(_amount);
         emit Withdraw(msg.sender, _amount);
@@ -174,7 +190,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         uint256 lastBalance = balance.lastBalance;
 
         uint256 timeElapsed = block.timestamp.sub(balance.lastTime);
-        uint256 cost = timeElapsed * balance.perSecondPrice;
+        uint256 cost = timeElapsed.mul(balance.perSecondPrice);
 
         // If the elapsed time has brought balance to 0, make it 0.
         uint256 newBalance;
@@ -207,7 +223,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         balance.lastTime = uint64(block.timestamp);
         emit Loss(_user, loss);
         
-        if(newBalance == 0) {
+        if (newBalance == 0) {
             balance.perSecondPrice = 0;
             emit PriceChange(_user, 0);
         }
@@ -223,9 +239,9 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     function changePrice(address _user, uint64 _newPrice)
       external
       override
+      onlyModule("PLAN")
       update(_user)
     {
-        require(msg.sender == getModule("PLAN"), "Caller is not PlanManager.");
         balances[_user].perSecondPrice = _newPrice;
         emit PriceChange(_user, _newPrice);
     }
