@@ -51,10 +51,10 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     // Event launched when an NFT expires.
     event RemovedNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
 
-    event ExpiredNFT(address indexed user, uint256 nftId);
+    event ExpiredNFT(address indexed user, uint256 nftId, uint256 timestamp);
     
     // Event launched when an NFT expires.
-    event WithdrawNFT(address indexed user, uint256 nftId);
+    event WithdrawRequest(address indexed user, uint256 nftId, uint256 timestamp, uint256 withdrawTimestamp);
     
     /**
      * @dev Construct the contract with the yNft contract.
@@ -125,6 +125,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         if (withdrawalTime == 0) {
             withdrawalTime = block.timestamp + withdrawalDelay;
             pendingWithdrawals[_nftId] = withdrawalTime;
+            emit WithdrawRequest(msg.sender, _nftId, block.timestamp, withdrawalTime);
             return;
         } else if (withdrawalTime > block.timestamp) {
             return;
@@ -210,7 +211,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     {
         address user = nftOwners[_nftId];
         _removeNft(_nftId);
-        emit ExpiredNFT(user, _nftId);
+        emit ExpiredNFT(user, _nftId, block.timestamp);
     }
 
     /**
@@ -235,6 +236,8 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
 
         // Returns the caller some gas as well as ensure this function cannot be called again.
         delete nftOwners[_nftId];
+
+        emit RemovedNFT(user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
     }
     
     /**
