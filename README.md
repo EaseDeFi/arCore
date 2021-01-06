@@ -1,15 +1,13 @@
 # Armor Core
 
 Armor Core allows users to buy cover for funds held on various DeFi protocols that will allow compensation in case the protocol is hacked. All cover is underwritten by Nexus Mutual. This cover is dynamic so it will be updated any time a user transfer funds to or from the protocol and it is pay-as-you-go, so a user only ever pays for the exact amount of cover needed. 
-<br>
-<br>
+
 ## ArmorMaster
 
 The ArmorMaster contract keeps track of modules and jobs within the Armor Core system. Each contract (BalanceManager, ClaimManager, PlanManager, RewardManager, and StakeManager) are registered on it so that they can easily get each other’s addresses.
 <br>
 There are also “jobs” on ArmorMaster, which, when enabled, will be called by the doKeep modifiers to perform maintenance functions. At the moment these maintenance functions include expiring balances and expiring NFTs.
-<br>
-<br>
+
 ## BalanceManager
 
 The BalanceManager contract keeps track of all borrower balances. It takes in Ether, is given a plans cost (per second) by the PlanManager, then charges users per second for the plan they hold. When charged, a percent of the funds charged may also be given to the developer, governance contract, or referrer of the user. The rest of the funds are then sent to RewardManager to be disbursed to stakers of the NFTs.
