@@ -1,6 +1,8 @@
 # Armor Core
 
 Armor Core allows users to buy cover for funds held on various DeFi protocols that will allow compensation in case the protocol is hacked. All cover is underwritten by Nexus Mutual. This cover is dynamic so it will be updated any time a user transfer funds to or from the protocol and it is pay-as-you-go, so a user only ever pays for the exact amount of cover needed. 
+<br>
+More information is available at https://armorfi.gitbook.io/armor/products/arcore
 
 ## ArmorMaster
 
@@ -31,6 +33,3 @@ The PlanManager contract keeps track of all user plans. A user submits an array 
 The ClaimManager contract takes care of any claims that may be made in the case of a hack. When a hack happens, the owner of the contract must submit a verification of the time and protocol, then NFTs that were active at that time may be submitted to Nexus Mutual through the arNFT contract.
 <br>
 After an NFT submission is accepted, if a user had coverage on that protocol at that time, they may then withdraw the full amount of coverage they had been paying for.
-<br>
-<br>
-More information is available at https://armorfi.gitbook.io/armor/products/arcore
