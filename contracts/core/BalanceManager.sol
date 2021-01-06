@@ -106,7 +106,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
                 BalanceExpireTracker.pop(head);
                 
                 if (ufOn) IRewardManager(getModule("UF")).withdraw(address(head), balances[address(head)].perSecondPrice);
-                balances[address(head)].perSecondPrice = 0;
+                updateBalance(address(head));
         
                 // Remove borrowed amount from PlanManager.        
                 _notifyBalanceChange(msg.sender);
