@@ -2,6 +2,7 @@
 
 Armor Core allows users to buy cover for funds held on various DeFi protocols that will allow compensation in case the protocol is hacked. All cover is underwritten by Nexus Mutual. This cover is dynamic so it will be updated any time a user transfer funds to or from the protocol and it is pay-as-you-go, so a user only ever pays for the exact amount of cover needed. 
 <br>
+<br>
 More information is available at https://armorfi.gitbook.io/armor/products/arcore
 
 ## ArmorMaster
