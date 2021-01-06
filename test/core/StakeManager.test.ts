@@ -14,8 +14,9 @@ describe("StakeManager", function () {
   let planManager: Contract;
   let claimManager: Contract;
   let stakeManager: Contract;
-
+  let utilizationFarm: Contract;
   let arNFT: Contract;
+  let token: Contract;
 
   let owner: Signer;
   let user: Signer;
@@ -51,6 +52,15 @@ describe("StakeManager", function () {
 
     // job
     await master.connect(owner).addJob(stringToBytes32("STAKE"));
+
+    const TokenFactory = await ethers.getContractFactory("ArmorToken");
+    token = await TokenFactory.deploy();
+    await master.connect(owner).registerModule(stringToBytes32("ARMOR"), token.address);
+
+    const UtilizationFarm = await ethers.getContractFactory("UtilizationFarm");
+    utilizationFarm = await UtilizationFarm.deploy();
+    await utilizationFarm.initialize(token.address, master.address);
+    await master.connect(owner).registerModule(stringToBytes32("UF"), utilizationFarm.address);
   });
 
   describe("#stakeNft()", function(){

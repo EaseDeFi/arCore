@@ -9,6 +9,7 @@ describe("GovernanceStaker", function () {
   let stakeManager: Signer;
   let rewardToken: Contract;
   let stakingToken: Contract;
+  let master: Contract;
 
   let user: Signer;
   let owner: Signer;
@@ -25,16 +26,20 @@ describe("GovernanceStaker", function () {
     rewardDistribution = accounts[2];
     rewardToken = await TokenFactory.connect(owner).deploy();
     stakingToken = await TokenFactory.connect(owner).deploy();
+
+    const MasterFactory = await ethers.getContractFactory("ArmorMaster");
+    master = await MasterFactory.deploy();
+    await master.connect(owner).initialize();
   });
 
   describe('#setRewardDistribution()', function(){
     beforeEach(async function(){
       const GovernanceStakerFactory = await ethers.getContractFactory("GovernanceStaker");
-      governanceStaker = await GovernanceStakerFactory.connect(owner).deploy(stakingToken.address, rewardToken.address);
+      governanceStaker = await GovernanceStakerFactory.connect(owner).deploy(stakingToken.address, rewardToken.address, master.address);
       await governanceStaker.connect(owner).setRewardDistribution(await rewardDistribution.getAddress());
     });
     it('should fail if msg.sender is not owner', async function(){
-      await expect(governanceStaker.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("msg.sender is not owner");
+      await expect(governanceStaker.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("only owner can call this function");
     });
 
     it('should change reward distribution address', async function(){
@@ -45,7 +50,7 @@ describe("GovernanceStaker", function () {
   describe('when reward token is eth', function(){
     beforeEach(async function(){
       const GovernanceStakerFactory = await ethers.getContractFactory("GovernanceStaker");
-      governanceStaker = await GovernanceStakerFactory.connect(owner).deploy(stakingToken.address, constants.AddressZero);
+      governanceStaker = await GovernanceStakerFactory.connect(owner).deploy(stakingToken.address, constants.AddressZero, master.address);
       await governanceStaker.connect(owner).setRewardDistribution(await rewardDistribution.getAddress());
     });
     describe('#notifyRewardAmount()', function(){
@@ -166,7 +171,7 @@ describe("GovernanceStaker", function () {
   describe('when reward token is not eth', function(){
     beforeEach(async function(){
       const GovernanceStakerFactory = await ethers.getContractFactory("GovernanceStaker");
-      governanceStaker = await GovernanceStakerFactory.connect(owner).deploy(stakingToken.address, rewardToken.address);
+      governanceStaker = await GovernanceStakerFactory.connect(owner).deploy(stakingToken.address, rewardToken.address, master.address);
       await governanceStaker.connect(owner).setRewardDistribution(await rewardDistribution.getAddress());
     });
     describe('#notifyRewardAmount()', function(){

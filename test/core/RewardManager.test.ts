@@ -35,26 +35,18 @@ describe("RewardManager", function () {
     
     const RewardFactory = await ethers.getContractFactory("RewardManager");
     rewardManager = await RewardFactory.deploy();
-    await rewardManager.connect(owner).initialize(master.address, token.address, await rewardDistribution.getAddress());
+    await rewardManager.connect(owner).initialize(master.address, token.address);
     await master.connect(owner).registerModule(stringToBytes32("REWARD"), rewardManager.address);
 
     await master.connect(owner).registerModule(stringToBytes32("STAKE"), await stakeManager.getAddress());
+
+    // Edited contract for reward distribution to just be BalanceManager.
+    await master.connect(owner).registerModule(stringToBytes32("BALANCE"), await rewardDistribution.getAddress());
   });
 
   describe('#initialize()', function(){
     it('should fail if already initialized', async function(){
-      await expect(rewardManager.connect(owner).initialize(token.address, await stakeManager.getAddress(), await rewardDistribution.getAddress())).to.be.revertedWith("already initialized");
-    });
-  });
-
-  describe('#setRewardDistribution()', function(){
-    it('should fail if msg.sender is not owner', async function(){
-      await expect(rewardManager.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("only owner can call this function");
-    });
-
-    it('should change reward distribution address', async function(){
-      await rewardManager.connect(owner).setRewardDistribution(await user.getAddress());
-      expect(await rewardManager.rewardDistribution()).to.be.equal(await user.getAddress());
+      await expect(rewardManager.connect(owner).initialize(token.address, await stakeManager.getAddress())).to.be.revertedWith("already initialized");
     });
   });
 
@@ -62,7 +54,7 @@ describe("RewardManager", function () {
     it('should fail if msg.sender is not rewardDistribution', async function(){
       await token.connect(owner).transfer(await rewardDistribution.getAddress(), 10000);
       await token.connect(rewardDistribution).approve(rewardManager.address, 10000);
-      await expect(rewardManager.connect(user).notifyRewardAmount(100)).to.be.revertedWith('Caller is not reward distribution');
+      await expect(rewardManager.connect(user).notifyRewardAmount(100)).to.be.revertedWith('only module BALANCE can call this function');
     });
 
     it('should fail if token is not approved', async function(){
@@ -142,36 +134,6 @@ describe("RewardManager", function () {
     });
   });
   
-  describe('#exit()', function(){
-    beforeEach(async function(){
-      await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
-      await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
-      await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
-      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
-      await increase(100);
-    });
-
-    it('should fail if msg.sender is not stake manager', async function(){
-      await expect(rewardManager.connect(owner).exit(await user.getAddress())).to.be.revertedWith('only module STAKE can call this function');
-    });
-
-    it('should decrease total supply', async function(){
-      await rewardManager.connect(stakeManager).exit(await user.getAddress());
-      expect(await rewardManager.totalSupply()).to.be.equal(0);
-    });
-
-    it('should decrease balanceOf user', async function(){
-      const address = await user.getAddress();
-      await rewardManager.connect(stakeManager).exit(address);
-      expect(await rewardManager.balanceOf(address)).to.be.equal(0);
-    });
-    
-    it('should decrease reward amount', async function(){
-      const address = await user.getAddress();
-      await rewardManager.connect(stakeManager).exit(address);
-      expect(await rewardManager.rewards(address)).to.be.equal(0);
-    });
-  });
   describe('#getReward()', function(){
     beforeEach(async function(){
       await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);

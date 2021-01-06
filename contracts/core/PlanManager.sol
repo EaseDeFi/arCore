@@ -110,10 +110,14 @@ contract PlanManager is ArmorModule, IPlanManager {
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
         uint256 endTime = balance.div(newPricePerSec).add(block.timestamp);
         
+        // Let's make sure a user can pay for this for at least a week. Weird manipulation of utilization farming could happen otherwise.
+        require(endTime >= block.timestamp.add(7 days), "Balance must be enough for 7 days of coverage.");
+        
         //add plan
         Plan memory newPlan;
         newPlan = Plan(uint64(now), uint64(endTime), uint128(_protocols.length));
         plans[msg.sender].push(newPlan);
+        
         //add protocol plan
         for(uint256 i = 0;i<_protocols.length; i++){
             bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",msg.sender,plans[msg.sender].length - 1,i));
@@ -217,7 +221,11 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @param _planIndex The index in the user's Plan array that we're checking.
      * @param _protocol Address of the protocol that a claim is being redeemed for.
     **/
-    function planRedeemed(address _user, uint256 _planIndex, address _protocol) external override onlyModule("CLAIM"){
+    function planRedeemed(address _user, uint256 _planIndex, address _protocol) 
+      external 
+      override 
+      onlyModule("CLAIM")
+    {
         Plan storage plan = plans[_user][_planIndex];
         require(plan.endTime < now, "Cannot redeem active plan, update plan to redeem properly");
 
@@ -258,8 +266,8 @@ contract PlanManager is ArmorModule, IPlanManager {
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(_user);
         uint256 pricePerSec = IBalanceManager(getModule("BALANCE")).perSecondPrice(_user);
         
-        if (plan.endTime >= now){
-            plan.endTime = uint64(balance / pricePerSec + now);
+        if (plan.endTime > block.timestamp) {
+            plan.endTime = uint64(balance.div(pricePerSec).add(block.timestamp));
         }
     }
     

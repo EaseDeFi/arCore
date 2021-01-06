@@ -9,6 +9,7 @@ describe("LPFarm", function () {
   let stakeManager: Signer;
   let rewardToken: Contract;
   let stakingToken: Contract;
+  let master: Contract;
 
   let user: Signer;
   let owner: Signer;
@@ -25,14 +26,20 @@ describe("LPFarm", function () {
     rewardDistribution = accounts[2];
     rewardToken = await TokenFactory.connect(owner).deploy();
     stakingToken = await TokenFactory.connect(owner).deploy();
+
+    const MasterFactory = await ethers.getContractFactory("ArmorMaster");
+    master = await MasterFactory.deploy();
+    await master.connect(owner).initialize();
+
     const LPFarmFactory = await ethers.getContractFactory("LPFarm");
-    lpfarm = await LPFarmFactory.connect(owner).deploy(stakingToken.address, rewardToken.address);
+    // Throwing Reward Distribution in here instead of master.
+    lpfarm = await LPFarmFactory.connect(owner).deploy(stakingToken.address, rewardToken.address, master.address);
     await lpfarm.connect(owner).setRewardDistribution(await rewardDistribution.getAddress());
   });
 
   describe('#setRewardDistribution()', function(){
     it('should fail if msg.sender is not owner', async function(){
-      await expect(lpfarm.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("msg.sender is not owner");
+      await expect(lpfarm.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("only owner can call this function");
     });
 
     it('should change reward distribution address', async function(){
