@@ -8,7 +8,7 @@ More information is available at https://armorfi.gitbook.io/armor/products/arcor
 ## ArmorMaster
 
 The ArmorMaster contract keeps track of modules and jobs within the Armor Core system. Each contract (BalanceManager, ClaimManager, PlanManager, RewardManager, and StakeManager) are registered on it so that they can easily get each other’s addresses.
-<br>
+<br><br>
 There are also “jobs” on ArmorMaster, which, when enabled, will be called by the doKeep modifiers to perform maintenance functions. At the moment these maintenance functions include expiring balances and expiring NFTs.
 
 ## BalanceManager
@@ -22,7 +22,7 @@ The RewardManager contract is used to disburse funds to stakers after users pay 
 ## StakeManager
 
 The StakeManager contract accepts NFTs that can then be lent out to borrowers. A user stakes their NFT, the NFT price is recorded, and they then receive rewards from RewardManager based on how much they paid for the NFT.
-<br>
+<br><br>
 NFTs may be withdrawn, but only after a 7 day withdrawal delay.
 
 ## PlanManager
