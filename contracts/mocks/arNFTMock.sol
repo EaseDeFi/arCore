@@ -545,8 +545,8 @@ contract arNFTMock is
     bool public swapActivated;
 
     // Mock data
-    uint256 public coverId__;
-    uint256 public claimId__;
+    uint256 public coverIdMock;
+    uint256 public claimIdMock;
 
     mapping(uint256 => uint8) status_;
     mapping(uint256 => uint256) sumAssured_;
@@ -805,27 +805,28 @@ contract arNFTMock is
     
         uint256 coverPrice = _coverDetails[1];
 
-        status_[coverId__] = 0;
-        sumAssured_[coverId__] = _coverDetails[0];
-        coverPeriod_[coverId__] = _coverPeriod;
-        validUntil_[coverId__] = now + _coverPeriod * 1 days;
-        scAddress_[coverId__] = _coveredContractAddress;
-        currencyCode_[coverId__] = _coverCurrency;
-        premiumNXM_[coverId__] = _coverDetails[2];
+        status_[coverIdMock] = 0;
+        sumAssured_[coverIdMock] = _coverDetails[0];
+        coverPeriod_[coverIdMock] = _coverPeriod;
+        validUntil_[coverIdMock] = now + _coverPeriod * 1 days;
+        scAddress_[coverIdMock] = _coveredContractAddress;
+        currencyCode_[coverIdMock] = _coverCurrency;
+        premiumNXM_[coverIdMock] = _coverDetails[2];
    
-        coverId = coverId__ ++;
+        coverId = coverIdMock ++;
         
         // Keep track of how much was paid for this cover.
         coverPrices[coverId] = coverPrice;
     }
     
+    function mockFillEther() external payable {}
     /**
      * @dev Internal submit claim function.
      * @param _coverId on the NXM contract (same as our token ID).
      * @return claimId of the new claim.
     **/
     function _submitClaim(uint256 _coverId) internal returns (uint256) {
-        return claimId__++;
+        return ++claimIdMock;
     }
     
     /**
