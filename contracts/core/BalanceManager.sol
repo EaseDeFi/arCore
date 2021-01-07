@@ -52,6 +52,9 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         uint64 perSecondPrice;
         uint128 lastBalance;
     }
+    
+    // Mapping of shields so we don't reward them for U.F.
+    mapping (address => bool) public arShields;
 
     // The last time a user has deposited.
     mapping (address => uint256) public lastUserUpdate;
@@ -90,8 +93,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
         
         // Either withdraw or stake depending on change in perSecondPrice.
-        if (newPerSecond > prevPerSecond && ufOn) IRewardManager(getModule("UF")).stake(_user, newPerSecond.sub(prevPerSecond));
-        else if (ufOn) IRewardManager(getModule("UF")).withdraw(_user, prevPerSecond.sub(newPerSecond));
+        if (newPerSecond > prevPerSecond && ufOn && !arShields[_user]) IRewardManager(getModule("UF")).stake(_user, newPerSecond.sub(prevPerSecond));
+        else if (ufOn && !arShields[_user]) IRewardManager(getModule("UF")).withdraw(_user, prevPerSecond.sub(newPerSecond));
     }
 
     /**
@@ -105,7 +108,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 BalanceExpireTracker.pop(head);
                 
-                if (ufOn) IRewardManager(getModule("UF")).withdraw(address(head), balances[address(head)].perSecondPrice);
+                if (ufOn && !arShields[address(head)]) IRewardManager(getModule("UF")).withdraw(address(head), balances[address(head)].perSecondPrice);
                 updateBalance(address(head));
         
                 // Remove borrowed amount from PlanManager.        
@@ -356,5 +359,15 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       onlyOwner
     {
         ufOn = !ufOn;
+    }
+    
+    /**
+     * @dev Toggle whether address is a shield.
+    **/
+    function toggleShield(address _shield)
+      external
+      onlyOwner
+    {
+        arShields[_shield] = !arShields[_shield];
     }
 }
