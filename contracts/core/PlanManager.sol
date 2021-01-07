@@ -95,6 +95,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         uint256 newPricePerSec;
         uint256 _markup = markup;
         
+        
         // Loop through protocols, find price per second, add to rate, add coverage amount to mapping.
         for (uint256 i = 0; i < _protocols.length; i++) {
             require(nftCoverPrice[_protocols[i]] != 0, "Protocol price is zero");
@@ -103,9 +104,19 @@ contract PlanManager is ArmorModule, IPlanManager {
             uint256 pricePerSec = nftCoverPrice[ _protocols[i] ].mul(_coverAmounts[i]);
             newPricePerSec = newPricePerSec.add(pricePerSec);
         }
-
+        
         //newPricePerSec = newPricePerSec * _markup / 1e18 for decimals / 100 to make up for markup (200 == 200%);
         newPricePerSec = newPricePerSec.mul(_markup).div(1e18).div(100);
+        
+        // this means user is canceling all plans
+        if(newPricePerSec == 0){
+            Plan memory newPlan;
+            newPlan = Plan(uint64(now), uint64(-1), uint128(0));
+            plans[msg.sender].push(newPlan);
+            IBalanceManager(getModule("BALANCE")).changePrice(msg.sender, 0);
+            emit PlanUpdate(msg.sender, _protocols, _coverAmounts, uint64(-1));
+            return;
+        }
 
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
         uint256 endTime = balance.div(newPricePerSec).add(block.timestamp);
@@ -203,7 +214,7 @@ contract PlanManager is ArmorModule, IPlanManager {
             Plan storage plan = planArray[uint256(i)];
             // Only one plan will be active at the time of a hack--return cover amount from then.
             if (_hackTime >= plan.startTime && _hackTime < plan.endTime) {
-                for(uint256 j = 0; j<= plan.length; j++){
+                for(uint256 j = 0; j< plan.length; j++){
                     bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,i,j));
                     if(IStakeManager(getModule("STAKE")).protocolAddress(protocolPlan[key].protocolId) == _protocol){
                         return (uint256(i), _amount <= uint256(protocolPlan[key].amount));
@@ -227,7 +238,7 @@ contract PlanManager is ArmorModule, IPlanManager {
       onlyModule("CLAIM")
     {
         Plan storage plan = plans[_user][_planIndex];
-        require(plan.endTime < now, "Cannot redeem active plan, update plan to redeem properly");
+        require(plan.endTime <= now, "Cannot redeem active plan, update plan to redeem properly");
 
         for (uint256 i = 0; i < plan.length; i++) {
             bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,_planIndex,i));
