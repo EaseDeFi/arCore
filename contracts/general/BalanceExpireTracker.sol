@@ -150,7 +150,7 @@ contract BalanceExpireTracker {
             // step 1 find prev bucket
             uint64 prevCursor = uint64( bucket.sub(BUCKET_STEP) );
             
-            while(checkPoints[prevCursor].tail != EMPTY){
+            while(checkPoints[prevCursor].tail == EMPTY){
               prevCursor = uint64( prevCursor.sub(BUCKET_STEP) );
             }
     
