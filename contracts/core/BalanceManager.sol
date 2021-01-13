@@ -9,7 +9,6 @@ import '../interfaces/IERC20.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
-
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -106,10 +105,11 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         for (uint256 i = 0; i < 3; i++) {
         
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
+                address oldHead = address(head);
+                uint256 oldPrice = balances[oldHead].perSecondPrice;
                 BalanceExpireTracker.pop(head);
-                
-                if (ufOn && !arShields[address(head)]) IRewardManager(getModule("UF")).withdraw(address(head), balances[address(head)].perSecondPrice);
-                updateBalance(address(head));
+                if (ufOn && !arShields[oldHead]) IRewardManager(getModule("UF")).withdraw(oldHead, oldPrice);
+                updateBalance(oldHead);
         
                 // Remove borrowed amount from PlanManager.        
                 _notifyBalanceChange(msg.sender);

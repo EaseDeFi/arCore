@@ -2,11 +2,11 @@
 
 pragma solidity ^0.6.6;
 
-import '../general/BalanceExpireTracker.sol';
+import '../general/ExpireTracker.sol';
+import 'hardhat/console.sol';
+contract ExpireTrackerMock is ExpireTracker {
 
-contract BalanceExpireTrackerMock is BalanceExpireTracker {
-
-    uint160 public lastId;
+    uint96 public lastId;
 
     uint256 public count;
 
@@ -15,17 +15,17 @@ contract BalanceExpireTrackerMock is BalanceExpireTracker {
     }
 
     function add(uint64 expiresAt) external {
-        uint160 id = ++lastId;
+        uint96 id = ++lastId;
         push(id, expiresAt);
         count++;
     }
 
-    function remove(uint160 id) external {
+    function remove(uint96 id) external {
         pop(id);
         count--;
     }
 
-    function forceAdd(uint160 id, uint64 expiresAt) external {
+    function forceAdd(uint96 id, uint64 expiresAt) external {
         push(id, expiresAt);
         count++;
     }

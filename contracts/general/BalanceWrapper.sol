@@ -3,7 +3,6 @@
 pragma solidity ^0.6.6;
 
 import '../libraries/SafeMath.sol';
-
 contract BalanceWrapper {
     using SafeMath for uint256;
 

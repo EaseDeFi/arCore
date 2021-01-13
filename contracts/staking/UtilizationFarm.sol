@@ -9,7 +9,6 @@ import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
-
 /**
  * @dev UtilizationFarm is nearly the exact same contract as RewardManager.
  *      Only difference is the initialize function instead of constructor.

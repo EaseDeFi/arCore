@@ -6,12 +6,12 @@ let step = BigNumber.from("86400");
 function getBucket(expire: BigNumber) : BigNumber {
   return (expire.div(step)).mul(step);
 }
-describe("BalanceExpireTracker", function(){
+describe("ExpireTracker", function(){
   let tracker: Contract;
   let now: BigNumber;
 
   beforeEach(async function(){
-    const Tracker = await ethers.getContractFactory("BalanceExpireTrackerMock");
+    const Tracker = await ethers.getContractFactory("ExpireTrackerMock");
     tracker = await Tracker.deploy();
     const realTime = await getTimestamp();
     await increase(getBucket(realTime).add(step).sub(realTime).toNumber());
