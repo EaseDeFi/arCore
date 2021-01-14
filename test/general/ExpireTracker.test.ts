@@ -513,4 +513,54 @@ describe("ExpireTracker", function(){
       });
     });
   });
+
+  describe("Gas usage check", async function(){
+    beforeEach(async function(){
+      await tracker.add(now);
+      await tracker.add(now.add(100));
+      for(let i = 1;i<10; i++) {
+        await tracker.add(now.add(step).add(100*i));
+      }
+      await tracker.add(now.add(step).add(1000));
+      await tracker.add(now.add(step.mul(2)).add(100));
+      await tracker.add(now.add(step.mul(2)).add(200));
+      await tracker.add(now.add(step.mul(3)).add(100));
+      await tracker.add(now.add(step.mul(4)).add(1000));
+    });
+    it("when 1 is expired", async function(){
+      await increase(50);
+      const receipt = await (await tracker.removeAllExpired()).wait();
+      console.log(receipt.gasUsed.toString());
+    });
+    it("when 2 is expired", async function(){
+      await increase(100);
+      const receipt = await (await tracker.removeAllExpired()).wait();
+      console.log(receipt.gasUsed.toString());
+    });
+    it("when 3 is expired", async function(){
+      await increase(step.add(101).toNumber());
+      const receipt = await (await tracker.removeAllExpired()).wait();
+      console.log(receipt.gasUsed.toString());
+    });
+    it("when 4 is expired", async function(){
+      await increase(step.add(201).toNumber());
+      const receipt = await (await tracker.removeAllExpired()).wait();
+      console.log(receipt.gasUsed.toString());
+    });
+    it("when 5 is expired", async function(){
+      await increase(step.add(301).toNumber());
+      const receipt = await (await tracker.removeAllExpired()).wait();
+      console.log(receipt.gasUsed.toString());
+    });
+    it("when 6 is expired", async function(){
+      await increase(step.add(401).toNumber());
+      const receipt = await (await tracker.removeAllExpired()).wait();
+      console.log(receipt.gasUsed.toString());
+    });
+    it("when all is expired", async function(){
+      await increase(step.mul(5).toNumber());
+      const receipt = await (await tracker.removeAllExpired()).wait();
+      console.log(receipt.gasUsed.toString());
+    });
+  });
 });

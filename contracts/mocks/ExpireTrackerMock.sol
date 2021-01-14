@@ -14,6 +14,12 @@ contract ExpireTrackerMock is ExpireTracker {
         return expired();
     }
 
+    function removeAllExpired() external {
+        while(expired()){
+            pop(head);
+        }
+    }
+
     function add(uint64 expiresAt) external {
         uint96 id = ++lastId;
         push(id, expiresAt);
