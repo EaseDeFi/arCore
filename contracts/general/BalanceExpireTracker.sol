@@ -68,7 +68,7 @@ contract BalanceExpireTracker {
         if (head == EMPTY) {
             // all the nfts are expired. so just add
             head = expireId;
-            tail = expireId; 
+            tail = expireId;
             checkPoints[bucket] = Bucket(expireId, expireId);
             infos[expireId] = ExpireMetadata(EMPTY,EMPTY,expiresAt);
             
@@ -81,6 +81,7 @@ contract BalanceExpireTracker {
             // pushing nft is going to expire first
             // update head
             infos[head].prev = expireId;
+
             infos[expireId] = ExpireMetadata(head, EMPTY, expiresAt);
             head = expireId;
             
@@ -212,6 +213,6 @@ contract BalanceExpireTracker {
         }
         revert("Info does not exist.");
     }
-    
+
     uint256[50] private __gap;
 }
