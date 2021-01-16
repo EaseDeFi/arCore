@@ -73,8 +73,8 @@ contract ExpireTracker {
         if (infos[head].expiresAt >= expiresAt) {
             // pushing nft is going to expire first
             // update head
-            infos[head].prev = expireId;
             infos[expireId] = ExpireMetadata(head,0,expiresAt);
+            infos[head].prev = expireId;
             head = expireId;
             
             // update head of bucket
@@ -92,9 +92,9 @@ contract ExpireTracker {
           
         // then check if depositing nft will last more than latest
         if (infos[tail].expiresAt <= expiresAt) {
-            infos[tail].next = expireId;
             // push nft at tail
             infos[expireId] = ExpireMetadata(0,tail,expiresAt);
+            infos[tail].next = expireId;
             tail = expireId;
             
             // update tail of bucket
