@@ -17,6 +17,8 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     using SafeMath for uint;
     
+    uint256 constant private DENOMINATOR = 1000;
+    
     // List of plans that a user has purchased so there is a historical record.
     mapping (address => Plan[]) public plans;
 
@@ -30,6 +32,20 @@ contract PlanManager is ArmorModule, IPlanManager {
     // Mapping to doKeep track of how much coverage we've sold for each protocol.
     // smart contract address => total borrowed cover
     mapping (address => uint256) public totalUsedCover;
+    
+    // Protocol => amount of coverage bought by shields (then shields plus) for that protocol.
+    // Keep track of these to only allow a % of staked NFTs to be bought by each.
+    mapping (address => uint256) public arShieldCover;
+    mapping (address => uint256) public arShieldPlusCover;
+    mapping (address => uint256) public coreCover;
+    
+    // Percent allocated to each part of the system. 350 == 35%.
+    uint256 public arShieldPercent;
+    uint256 public arShieldPlusPercent;
+    uint256 public corePercent;
+    
+    // Mapping of the address of shields => 1 if they're arShield and 2 if they're arShieldPlus.
+    mapping (address => uint256) public arShields;
     
     // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
     uint256 public markup;
@@ -51,6 +67,9 @@ contract PlanManager is ArmorModule, IPlanManager {
     ) external override {
         initializeModule(_armorMaster);
         markup = 150;
+        arShieldPercent = 350;
+        arShieldPlusPercent = 350;
+        corePercent = 300;
     }
     
     function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end){
@@ -158,6 +177,15 @@ contract PlanManager is ArmorModule, IPlanManager {
             ProtocolPlan memory protocol = protocolPlan[key];
             address protocolAddress = IStakeManager(getModule("STAKE")).protocolAddress(protocol.protocolId);
             totalUsedCover[protocolAddress] = totalUsedCover[protocolAddress].sub(uint256(protocol.amount));
+            
+            uint256 shield = arShields[_user];
+            if (shield == 1) {
+                arShieldCover[protocolAddress] = arShieldCover[protocolAddress].sub(protocol.amount);
+            } else if (shield == 2) {
+                arShieldPlusCover[protocolAddress] = arShieldPlusCover[protocolAddress].sub(protocol.amount);
+            } else {
+                coreCover[protocolAddress] = coreCover[protocolAddress].sub(protocol.amount);
+            }   
         }
     }
 
@@ -168,9 +196,19 @@ contract PlanManager is ArmorModule, IPlanManager {
     **/
     function _addNewTotals(address[] memory _newProtocols, uint256[] memory _newCoverAmounts) internal {
         for (uint256 i = 0; i < _newProtocols.length; i++) {
+            
+            (uint256 shield, uint256 allowed) = _checkBuyerAllowed(_newProtocols[i]);
+            require(allowed >= _newCoverAmounts[i], "Exceeds allowed cover amount.");
+            
             totalUsedCover[_newProtocols[i]] = totalUsedCover[_newProtocols[i]].add(_newCoverAmounts[i]);
-            // Check StakeManager to ensure the new total amount does not go above the staked amount.
-            require(IStakeManager(getModule("STAKE")).allowedCover(_newProtocols[i], totalUsedCover[_newProtocols[i]]), "Exceeds total cover amount");
+            
+            if (shield == 1) {
+                arShieldCover[_newProtocols[i]] = arShieldCover[_newProtocols[i]].add(_newCoverAmounts[i]);
+            } else if (shield == 2) {
+                arShieldPlusCover[_newProtocols[i]] = arShieldPlusCover[_newProtocols[i]].add(_newCoverAmounts[i]);
+            } else {
+                coreCover[_newProtocols[i]] = coreCover[_newProtocols[i]].add(_newCoverAmounts[i]);
+            }
         }
     }
 
@@ -182,13 +220,37 @@ contract PlanManager is ArmorModule, IPlanManager {
       external
       override
       view
-    returns(uint256) {
-        uint256 stakedAmount = IStakeManager(getModule("STAKE")).totalStakedAmount(_protocol);
-        uint256 used = totalUsedCover[_protocol];
-        if(used > stakedAmount) {
-            return 0;
+    returns (uint256) {
+        (/* uint256 shield */, uint256 allowed) = _checkBuyerAllowed(_protocol);
+        return allowed;
+    }
+    
+    /**
+     * @dev Check whether the buyer is allowed to purchase this amount of cover.
+     *      Used because core can only buy 30%, and 35% for shields.
+     * @param _protocol The protocol cover is being purchased for.
+    **/
+    function _checkBuyerAllowed(address _protocol)
+      internal
+      view
+    returns (uint256, uint256)
+    {
+        uint256 totalAllowed = IStakeManager(getModule("STAKE")).totalStakedAmount(_protocol);
+        uint256 shield = arShields[msg.sender];
+            
+        if (shield == 1) {
+            uint256 currentCover = arShieldCover[_protocol];
+            uint256 allowed = totalAllowed * arShieldPercent / DENOMINATOR;
+            return (shield, allowed > currentCover ? allowed - currentCover : 0);
+        } else if (shield == 2) {
+            uint256 currentCover = arShieldPlusCover[_protocol];
+            uint256 allowed = totalAllowed * arShieldPlusPercent / DENOMINATOR;
+            return (shield, allowed > currentCover ? allowed - currentCover : 0);
+        } else {
+            uint256 currentCover = coreCover[_protocol];
+            uint256 allowed = totalAllowed * corePercent / DENOMINATOR;
+            return (shield, allowed > currentCover ? allowed - currentCover : 0);        
         }
-        return stakedAmount.sub(used);
     }
     
     /**
@@ -293,4 +355,36 @@ contract PlanManager is ArmorModule, IPlanManager {
         require(_newMarkup >= 100, "Markup must be at least 0 (100%).");
         markup = _newMarkup;
     }
+    
+    /**
+     * @dev Owner (DAO) can adjust the percent of coverage allowed for each product.
+     * @param _newCorePercent New percent of coverage for general arCore users.
+     * @param _newArShieldPercent New percent of coverage for arShields.
+     * @param _newArShieldPlusPercent New percent of coverage for arShield Plus.
+    **/
+    function adjustPercents(uint256 _newCorePercent, uint256 _newArShieldPercent, uint256 _newArShieldPlusPercent)
+      external
+      onlyOwner
+    {
+        require(_newCorePercent + _newArShieldPercent + _newArShieldPlusPercent <= 1000, "Total allocation cannot be more than 100%.");
+        corePercent = _newCorePercent;
+        arShieldPercent = _newArShieldPercent;
+        arShieldPlusPercent = _newArShieldPlusPercent;
+    }
+    
+    /**
+     * @dev Owner (DAO) can adjust shields on the contract.
+     * @param _shieldAddress Array of addresses we're adjusting.
+     * @param _shieldType Type of shield: 1 for arShield, 2 for arShield Plus.
+    **/
+    function adjustShields(address[] calldata _shieldAddress, uint256[] calldata _shieldType)
+      external
+      onlyOwner
+    {
+        require(_shieldAddress.length == _shieldType.length, "Submitted arrays are not of equal length.");
+        for (uint256 i = 0; i < _shieldAddress.length; i++) {
+            arShields[_shieldAddress[i]] = _shieldType[i];
+        }
+    }
+    
 }
