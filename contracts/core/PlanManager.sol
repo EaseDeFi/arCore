@@ -366,7 +366,7 @@ contract PlanManager is ArmorModule, IPlanManager {
       external
       onlyOwner
     {
-        require(_newCorePercent + _newArShieldPercent + _newArShieldPlusPercent <= 1000, "Total allocation cannot be more than 100%.");
+        require(_newCorePercent + _newArShieldPercent + _newArShieldPlusPercent == 1000, "Total allocation cannot be more than 100%.");
         corePercent = _newCorePercent;
         arShieldPercent = _newArShieldPercent;
         arShieldPlusPercent = _newArShieldPlusPercent;
