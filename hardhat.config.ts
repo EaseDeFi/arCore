@@ -1,10 +1,17 @@
 import "@nomiclabs/hardhat-waffle";
 import "solidity-coverage";
 import "hardhat-spdx-license-identifier";
+import "hardhat-gas-reporter";
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
 export default {
+  gasReporter: {
+    enabled: true,
+    currency: "USD",
+    gasPrice: 100,
+    outputFile: "gasReport.txt"
+  },
   spdxLicenseIdentifier: {
     overwrite: true,
     runOnCompile: true,
