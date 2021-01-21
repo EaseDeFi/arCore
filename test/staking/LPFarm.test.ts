@@ -5,6 +5,7 @@ import { time } from "@openzeppelin/test-helpers";
 import { increase } from "../utils";
 describe("LPFarm", function () {
   let accounts: Signer[];
+  let farmController: Contract;
   let lpfarm: Contract;
   let rewardToken: Contract;
   let stakingToken: Contract;
@@ -12,16 +13,14 @@ describe("LPFarm", function () {
 
   let user: Signer;
   let owner: Signer;
-  let rewardDistribution: Signer;
   let amount = 1000000;
   let rewardAmount = amount * 100;
   beforeEach(async function () {
     const TokenFactory = await ethers.getContractFactory("ERC20Mock");
 
     accounts = await ethers.getSigners(); 
-    user = accounts[4];
     owner = accounts[0];
-    rewardDistribution = accounts[2];
+    user = accounts[4];
     rewardToken = await TokenFactory.connect(owner).deploy();
     stakingToken = await TokenFactory.connect(owner).deploy();
 
@@ -29,64 +28,49 @@ describe("LPFarm", function () {
     master = await MasterFactory.deploy();
     await master.connect(owner).initialize();
 
+    const FarmControllerFactory = await ethers.getContractFactory("FarmController");
+    farmController = await FarmControllerFactory.deploy();
+    await farmController.initialize(rewardToken.address);
+    await farmController.addFarm(stakingToken.address);
+    const farmAddress = await farmController.lpFarm(stakingToken.address);
+
     const LPFarmFactory = await ethers.getContractFactory("LPFarm");
+    lpfarm = await LPFarmFactory.attach(farmAddress);
+    await farmController.connect(owner).setRates([1]);
     // Throwing Reward Distribution in here instead of master.
-    lpfarm = await LPFarmFactory.connect(owner).deploy(stakingToken.address, rewardToken.address, master.address);
-    await lpfarm.connect(owner).setRewardDistribution(await rewardDistribution.getAddress());
+    //lpfarm = await LPFarmFactory.connect(owner).deploy(stakingToken.address, rewardToken.address, master.address);
   });
 
-  describe('#setRewardDistribution()', function(){
-    it('should fail if msg.sender is not owner', async function(){
-      await expect(lpfarm.connect(user).setRewardDistribution(await user.getAddress())).to.be.revertedWith("only owner can call this function");
-    });
-
-    it('should change reward distribution address', async function(){
-      await lpfarm.connect(owner).setRewardDistribution(await user.getAddress());
-      expect(await lpfarm.rewardDistribution()).to.be.equal(await user.getAddress());
-    });
-  });
   describe('#notifyRewardAmount()', function(){
-    it('should fail if msg.sender is not rewardDistribution', async function(){
-      await rewardToken.connect(owner).transfer(await rewardDistribution.getAddress(), 10000);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, 10000);
-      await expect(lpfarm.connect(user).notifyRewardAmount(100)).to.be.revertedWith('Caller is not reward distribution');
+    it('should fail if msg.sender is not controller', async function(){
+      await rewardToken.connect(owner).approve(lpfarm.address, 10000);
+      await expect(lpfarm.connect(user).notifyRewardAmount(100)).to.be.revertedWith('Caller is not controller');
     });
 
     it('should fail if token is not approved', async function(){
-      await rewardToken.connect(owner).transfer(await rewardDistribution.getAddress(), 10000);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, 1);
-      await expect(lpfarm.connect(rewardDistribution).notifyRewardAmount(100)).to.be.reverted;
-    });
-
-    it('should fail if msg.value is not zero', async function(){
-      await rewardToken.connect(owner).transfer(await rewardDistribution.getAddress(), 10000);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, 100);
-      await expect(lpfarm.connect(rewardDistribution).notifyRewardAmount(100, {value:100})).to.be.reverted;
+      await rewardToken.connect(owner).approve(farmController.address, 1);
+      await expect(lpfarm.connect(owner).notifyRewardAmount(100)).to.be.reverted;
     });
 
     it('should increase token balance', async function(){
-      await rewardToken.connect(owner).transfer(await rewardDistribution.getAddress(), 10000);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, 10000);
-      await lpfarm.connect(rewardDistribution).notifyRewardAmount(100);
+      await rewardToken.connect(owner).approve(farmController.address, 100);
+      await farmController.connect(owner).notifyRewards(100);
       expect(await rewardToken.balanceOf(lpfarm.address)).to.equal(100);
     });
 
     it('should be able to notify when period is not finished', async function(){
-      await rewardToken.connect(owner).transfer(await rewardDistribution.getAddress(), 10000);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, 10000);
-      await lpfarm.connect(rewardDistribution).notifyRewardAmount(100);
+      await rewardToken.connect(owner).approve(farmController.address, 1000000);
+      await farmController.connect(owner).notifyRewards(1000000);
       await increase(10000);
-      await rewardToken.connect(owner).transfer(await rewardDistribution.getAddress(), 10000);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, 10000);
-      await lpfarm.connect(rewardDistribution).notifyRewardAmount(100);
+      await rewardToken.connect(owner).approve(farmController.address, 1000000);
+      await farmController.connect(owner).notifyRewards(1000000);
     });
   });
 
   describe('#stake()', function(){
     beforeEach(async function(){
-      await rewardToken.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, rewardAmount);
-      await lpfarm.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+      await rewardToken.connect(owner).approve(farmController.address, 1000000);
+      await farmController.connect(owner).notifyRewards(1000000);
     });
 
     it('should fail if amount is zero', async function(){
@@ -111,12 +95,11 @@ describe("LPFarm", function () {
 
   describe('#withdraw()', function(){
     beforeEach(async function(){
-      await rewardToken.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, rewardAmount);
+      await rewardToken.connect(owner).approve(farmController.address, 100000000);
       await stakingToken.connect(owner).mint(await user.getAddress(), amount);
       await stakingToken.connect(user).approve(lpfarm.address, amount);
       await lpfarm.connect(user).stake(amount);
-      await lpfarm.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+      await farmController.connect(owner).notifyRewards(10000000);
       await increase(100);
     });
     it('should fail if amount is zero', async function(){
@@ -144,9 +127,8 @@ describe("LPFarm", function () {
 
   describe('#exit()', function(){
     beforeEach(async function(){
-      await rewardToken.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, rewardAmount);
-      await lpfarm.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+      await rewardToken.connect(owner).approve(farmController.address, 1000000);
+      await farmController.connect(owner).notifyRewards(1000000);
       await stakingToken.connect(owner).mint(await user.getAddress(), amount);
       await stakingToken.connect(user).approve(lpfarm.address, amount);
       await lpfarm.connect(user).stake(amount);
@@ -172,9 +154,8 @@ describe("LPFarm", function () {
   });
   describe('#getReward()', function(){
     beforeEach(async function(){
-      await rewardToken.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
-      await rewardToken.connect(rewardDistribution).approve(lpfarm.address, rewardAmount);
-      await lpfarm.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
+      await rewardToken.connect(owner).approve(farmController.address, 1000000);
+      await farmController.connect(owner).notifyRewards(1000000);
       await stakingToken.connect(owner).mint(await user.getAddress(), amount);
       await stakingToken.connect(user).approve(lpfarm.address, amount);
       await lpfarm.connect(user).stake(amount);

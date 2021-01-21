@@ -72,13 +72,14 @@ contract LPFarm is TokenWrapper, IRewardDistributionRecipientTokenOnly {
     }
 
     modifier checkBlackList(address user) {
-        require(controller.blackListed(user), "User is blacklisted");
+        require(!controller.blackListed(user), "User is blacklisted");
         _;
     }
 
-    constructor(address _stakeToken, address _rewardToken, address _controller)
-      public
+    function initialize(address _stakeToken, address _controller)
+      external
     {
+        require(address(stakeToken) == address(0), "already initialized");
         stakeToken = IERC20(_stakeToken);
         controller = FarmController(_controller);
         rewardToken = controller.rewardToken();
@@ -89,8 +90,8 @@ contract LPFarm is TokenWrapper, IRewardDistributionRecipientTokenOnly {
         override
         onlyOwner
     {
-        rewardDistribution = _rewardDistribution;
     }
+
 
     function lastTimeRewardApplicable() public view returns (uint256) {
         return Math.min(block.timestamp, periodFinish);

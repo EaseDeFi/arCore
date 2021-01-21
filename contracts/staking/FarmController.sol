@@ -2,6 +2,7 @@
 
 pragma solidity ^0.6.6;
 
+import "./LPFarm.sol";
 import "../general/Ownable.sol";
 import "../interfaces/IRewardDistributionRecipientTokenOnly.sol";
 import "../interfaces/IERC20.sol";
@@ -12,22 +13,29 @@ contract FarmController is Ownable {
     using SafeERC20 for IERC20;
 
     IRewardDistributionRecipientTokenOnly[] public farms;
+    mapping(address => address) public lpFarm;
     mapping(address => uint256) public rate;
-    uint256 public constant DENOMINATOR = 100000;
+    uint256 public weightSum;
     IERC20 public rewardToken;
 
     mapping(address => bool) public blackListed;
 
     function initialize(address token) external {
         Ownable.initializeOwnable();
-        rewardToken = IERC20(rewardToken);
+        rewardToken = IERC20(token);
     }
 
-    function addFarm(address _farm) external onlyOwner {
-        require(rate[_farm] == 0, "already registerd farm");
-        require(IRewardDistributionRecipientTokenOnly(_farm).rewardToken() == rewardToken, "reward token does not match");
-        farms.push(IRewardDistributionRecipientTokenOnly(_farm));
-        rewardToken.approve(_farm, uint256(-1));
+    function addFarm(address _lptoken) external onlyOwner returns(address farm){
+        require(lpFarm[_lptoken] == address(0), "farm exist");
+        bytes memory bytecode = type(LPFarm).creationCode;
+        bytes32 salt = keccak256(abi.encodePacked(_lptoken));
+        assembly {
+            farm := create2(0, add(bytecode, 32), mload(bytecode), salt)
+        }
+        LPFarm(farm).initialize(_lptoken, address(this));
+        farms.push(IRewardDistributionRecipientTokenOnly(farm));
+        rewardToken.approve(farm, uint256(-1));
+        lpFarm[_lptoken] = farm;
         // it will just set the rates to zero before it get's it's own rate
     }
 
@@ -38,14 +46,20 @@ contract FarmController is Ownable {
             sum += _rates[i];
             rate[address(farms[i])] = _rates[i];
         }
-        require(sum == DENOMINATOR, "sum should be 100%");
+        weightSum = sum;
+    }
+
+    function setRateOf(address _farm, uint256 _rate) external onlyOwner {
+        weightSum -= rate[_farm];
+        weightSum += _rate;
+        rate[_farm] = _rate;
     }
 
     function notifyRewards(uint256 amount) external onlyOwner {
         rewardToken.transferFrom(msg.sender, address(this), amount);
         for(uint256 i = 0; i<farms.length; i++){
             IRewardDistributionRecipientTokenOnly farm = farms[i];
-            farm.notifyRewardAmount(amount.mul(rate[address(farm)]).div(DENOMINATOR));
+            farm.notifyRewardAmount(amount.mul(rate[address(farm)]).div(weightSum));
         }
     }
 
@@ -56,7 +70,7 @@ contract FarmController is Ownable {
         require(to <= farms.length, "to should be smaller or equal to farms.length");
         for(uint256 i = from; i < to; i++){
             IRewardDistributionRecipientTokenOnly farm = farms[i];
-            farm.notifyRewardAmount(amount.mul(rate[address(farm)]).div(DENOMINATOR));
+            farm.notifyRewardAmount(amount.mul(rate[address(farm)]).div(weightSum));
         }
     }
 

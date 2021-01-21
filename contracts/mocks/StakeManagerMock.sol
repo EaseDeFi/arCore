@@ -4,7 +4,7 @@ pragma solidity ^0.6.6;
 import "../interfaces/IPlanManager.sol";
 
 contract StakeManagerMock {
-    mapping(address => uint256) limit;
+    mapping(address => uint256) public totalStakedAmount;
 
     address planManager;
 
@@ -25,11 +25,11 @@ contract StakeManagerMock {
     }
 
     function allowedCover(address _protocol, uint256 _total) external view returns (bool) {
-        return limit[_protocol] >= _total;
+        return totalStakedAmount[_protocol] >= _total;
     }
 
     function mockLimitSetter(address _protocol, uint256 _limit) external {
-        limit[_protocol] = _limit;
+        totalStakedAmount[_protocol] = _limit;
     }
 
     function mockSetPlanManager(address _planManager) external {
