@@ -6,7 +6,6 @@ import { increase } from "../utils";
 describe("LPFarm", function () {
   let accounts: Signer[];
   let lpfarm: Contract;
-  let stakeManager: Signer;
   let rewardToken: Contract;
   let stakingToken: Contract;
   let master: Contract;
@@ -22,7 +21,6 @@ describe("LPFarm", function () {
     accounts = await ethers.getSigners(); 
     user = accounts[4];
     owner = accounts[0];
-    stakeManager = accounts[1];
     rewardDistribution = accounts[2];
     rewardToken = await TokenFactory.connect(owner).deploy();
     stakingToken = await TokenFactory.connect(owner).deploy();

@@ -41,7 +41,7 @@ import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 contract UtilizationFarm is ArmorModule, BalanceWrapper, IRewardDistributionRecipientTokenOnly {
     using SafeERC20 for IERC20;
 
-    IERC20 public rewardToken;
+    IERC20 public override rewardToken;
     address public rewardDistribution;
     uint256 public constant DURATION = 7 days;
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.6;
-
+import './FarmController.sol';
 import '../general/ArmorModule.sol';
 import '../general/TokenWrapper.sol';
+import '../general/Ownable.sol';
 import '../libraries/Math.sol';
 import '../libraries/SafeMath.sol';
-import '../interfaces/IERC20.sol';
 import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 
 /**
@@ -33,9 +33,10 @@ import '../interfaces/IRewardDistributionRecipientTokenOnly.sol';
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 */
 
-contract LPFarm is TokenWrapper, ArmorModule, IRewardDistributionRecipientTokenOnly {
-    IERC20 public rewardToken;
+contract LPFarm is TokenWrapper, IRewardDistributionRecipientTokenOnly {
+    IERC20 public override rewardToken;
     address public rewardDistribution;
+    FarmController public controller;
     uint256 public constant DURATION = 7 days;
 
     uint256 public periodFinish = 0;
@@ -60,17 +61,27 @@ contract LPFarm is TokenWrapper, ArmorModule, IRewardDistributionRecipientTokenO
         _;
     }
 
-    modifier onlyRewardDistribution() {
-        require(msg.sender == rewardDistribution, "Caller is not reward distribution");
+    modifier onlyController() {
+        require(msg.sender == address(controller), "Caller is not controller");
         _;
     }
 
-    constructor(address _stakeToken, address _rewardToken, address _armorMaster)
+    modifier onlyOwner() {
+        require(msg.sender == Ownable(address(controller)).owner(), "Caller is not owner");
+        _;
+    }
+
+    modifier checkBlackList(address user) {
+        require(controller.blackListed(user), "User is blacklisted");
+        _;
+    }
+
+    constructor(address _stakeToken, address _rewardToken, address _controller)
       public
     {
-        ArmorModule.initializeModule(_armorMaster);
         stakeToken = IERC20(_stakeToken);
-        rewardToken = IERC20(_rewardToken);
+        controller = FarmController(_controller);
+        rewardToken = controller.rewardToken();
     }
 
     function setRewardDistribution(address _rewardDistribution)
@@ -108,13 +119,13 @@ contract LPFarm is TokenWrapper, ArmorModule, IRewardDistributionRecipientTokenO
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(uint256 amount) public override updateReward(msg.sender) {
+    function stake(uint256 amount) public override checkBlackList(msg.sender) updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
         super.stake(amount);
         emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public override updateReward(msg.sender) {
+    function withdraw(uint256 amount) public override checkBlackList(msg.sender) updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
         super.withdraw(amount);
         emit Withdrawn(msg.sender, amount);
@@ -125,7 +136,7 @@ contract LPFarm is TokenWrapper, ArmorModule, IRewardDistributionRecipientTokenO
         getReward();
     }
 
-    function getReward() public updateReward(msg.sender) {
+    function getReward() public checkBlackList(msg.sender) updateReward(msg.sender) {
         uint256 reward = earned(msg.sender);
         if (reward > 0) {
             rewards[msg.sender] = 0;
@@ -137,7 +148,7 @@ contract LPFarm is TokenWrapper, ArmorModule, IRewardDistributionRecipientTokenO
     function notifyRewardAmount(uint256 reward)
         external
         override
-        onlyRewardDistribution
+        onlyController
         updateReward(address(0))
     {
         rewardToken.safeTransferFrom(msg.sender, address(this), reward);
