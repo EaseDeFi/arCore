@@ -70,4 +70,18 @@ describe.only("Vesting", function(){
       }
     });
   });
+
+  describe("#claim()", async function(){
+    it("should fail if release is not started yet", async function(){
+      await expect(vesting.connect(recipients[0]).claim()).to.be.reverted;
+    });
+
+    it("should release the appropriate values", async function(){
+      await increaseTo(now.add(100).toNumber());
+      await increase(100);
+      await vesting.connect(recipients[0]).claim();
+      const expectedAmount = totalAmount.mul(1).div(55).div(100);
+      expect(await token.balanceOf(recipients[0].getAddress())).to.equal(expectedAmount);
+    });
+  });
 });

@@ -5,3 +5,4 @@ artifacts/
 cache/
 coverage/
 coverage.json
+gasReport.txt
