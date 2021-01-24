@@ -78,9 +78,20 @@ describe.only("Vesting", function(){
 
     it("should release the appropriate values", async function(){
       await increaseTo(now.add(100).toNumber());
+      await increase(300);
+      await vesting.connect(recipients[0]).claim();
+      const expectedAmount = totalAmount.mul(3).div(55).div(100);
+      expect(await token.balanceOf(recipients[0].getAddress())).to.equal(expectedAmount);
+    });
+
+    it("should release appropriate vlaues even if there was a claim", async function(){
+      await increaseTo(now.add(100).toNumber());
       await increase(100);
       await vesting.connect(recipients[0]).claim();
-      const expectedAmount = totalAmount.mul(1).div(55).div(100);
+      expect(await vesting.released(recipients[0].getAddress())).to.equal(totalAmount.mul(1).div(55).div(100));
+      await increaseTo(now.add(400).toNumber());
+      await vesting.connect(recipients[0]).claim();
+      const expectedAmount = totalAmount.mul(3).div(55).div(100);
       expect(await token.balanceOf(recipients[0].getAddress())).to.equal(expectedAmount);
     });
   });
