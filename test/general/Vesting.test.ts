@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { getTimestamp, increase, increaseTo, mine } from "../utils";
 
-describe.only("Vesting", function(){
+describe("Vesting", function(){
   let vesting: Contract;
   let token: Contract;
   let now: BigNumber;

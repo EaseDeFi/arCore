@@ -120,24 +120,24 @@ contract LPFarm is TokenWrapper, IRewardDistributionRecipientTokenOnly {
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(uint256 amount) public override checkBlackList(msg.sender) updateReward(msg.sender) {
+    function stake(uint256 amount) public virtual override checkBlackList(msg.sender) updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
         super.stake(amount);
         emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public override checkBlackList(msg.sender) updateReward(msg.sender) {
+    function withdraw(uint256 amount) public virtual override checkBlackList(msg.sender) updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
         super.withdraw(amount);
         emit Withdrawn(msg.sender, amount);
     }
 
-    function exit() external {
+    function exit() external virtual {
         withdraw(balanceOf(msg.sender));
         getReward();
     }
 
-    function getReward() public checkBlackList(msg.sender) updateReward(msg.sender) {
+    function getReward() public checkBlackList(msg.sender) updateReward(msg.sender) virtual {
         uint256 reward = earned(msg.sender);
         if (reward > 0) {
             rewards[msg.sender] = 0;
