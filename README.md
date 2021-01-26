@@ -4,11 +4,10 @@ Armor Core allows users to buy cover for funds held on various DeFi protocols th
 <br>
 <br>
 More information is available at https://armorfi.gitbook.io/armor/products/arcore
-<br>
-<br>
+
 ## Bug bounty
 
-Bug bounty information is available at https://immunefi.com/bounty/armorfi/. Top reward is 1 million ARMOR for a critical vulnerability that will lead to the loss of over $1 million in user funds.
+Bug bounty information is available at https://immunefi.com/bounty/armorfi/. Top reward is 1 million ARMOR for a critical vulnerability that will lead to the loss of over $1 million in user funds. Vesting.sol, SushiLPFarm.sol, and SushiFarmController.sol are not eligible for bug bounty quite yet.
 
 ## ArmorMaster
 
