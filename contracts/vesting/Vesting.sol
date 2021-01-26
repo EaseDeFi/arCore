@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.0;
 
-import "./Ownable.sol";
+import "../general/Ownable.sol";
 import "../interfaces/IERC20.sol";
 
 contract Vesting {
