@@ -7,8 +7,8 @@ interface IBalanceManager {
   event Withdraw(address indexed user, uint256 amount);
   event Loss(address indexed user, uint256 amount);
   event PriceChange(address indexed user, uint256 price);
-  event AffiliatePaid(address indexed affiliate, address indexed referral, uint256 amount);
-  event ReferralAdded(address indexed addiliate, address indexed referral);
+  event AffiliatePaid(address indexed affiliate, address indexed referral, uint256 amount, uint256 timestamp);
+  event ReferralAdded(address indexed affiliate, address indexed referral, uint256 timestamp);
   function deposit(address _referrer) external payable;
   function withdraw(uint256 _amount) external;
   function updateBalance(address _user) external;

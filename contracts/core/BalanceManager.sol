@@ -146,7 +146,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         if ( referrers[msg.sender] == address(0) ) {
             referrers[msg.sender] = _referrer != address(0) ? _referrer : devWallet;
-            emit ReferralAdded(_referrer, msg.sender);
+            emit ReferralAdded(_referrer, msg.sender, block.timestamp);
         }
         
         require(msg.value > 0, "No Ether was deposited.");
@@ -299,7 +299,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         
         if (refAmount > 0) {
             balances[ referrers[_user] ].lastBalance = uint128( balances[ referrers[_user] ].lastBalance.add(refAmount) );
-            emit AffiliatePaid(_user, referrers[_user], refAmount);
+            emit AffiliatePaid(referrers[_user], _user, refAmount, block.timestamp);
         }
         if (devAmount > 0) balances[devWallet].lastBalance = uint128( balances[devWallet].lastBalance.add(devAmount) );
         if (govAmount > 0) balances[address(governanceStaker)].lastBalance = uint128( balances[address(governanceStaker)].lastBalance.add(govAmount) );
