@@ -197,7 +197,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         _addCovers(_user, weiSumAssured, secondPrice, scAddress);
         
         // Add to utilization farming.
-        if (ufOn) IRewardManager(getModule("UF")).stake(_user, secondPrice);
+        if (ufOn) IRewardManager(getModule("UFS")).stake(_user, secondPrice);
         
         emit StakedNFT(_user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
     }
@@ -232,7 +232,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         _subtractCovers(user, _nftId, weiSumAssured, secondPrice, scAddress);
         
         // Exit from utilization farming.
-        if (ufOn) IRewardManager(getModule("UF")).withdraw(user, secondPrice);
+        if (ufOn) IRewardManager(getModule("UFS")).withdraw(user, secondPrice);
 
         // Returns the caller some gas as well as ensure this function cannot be called again.
         delete nftOwners[_nftId];
