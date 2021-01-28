@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
-import { increase } from "../utils";
+import { increase, mine } from "../utils";
 
 function stringToBytes32(str: string) : string {
   return ethers.utils.formatBytes32String(str);
@@ -141,6 +141,7 @@ describe("RewardManager", function () {
       await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
       await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
       await increase(86400*10);
+      await mine();
     });
 
     it('should be rewarded for all reward amount', async function(){

@@ -1,3 +1,3 @@
 module.exports = {
-  skipFiles: ['nexusmutual_contracts', 'mocks']
+  skipFiles: ['mocks/', 'external/', 'proxies/']
 };

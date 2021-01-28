@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
-import { increase } from "../utils";
+import { increase, mine } from "../utils";
 describe("GovernanceStaker", function () {
   let accounts: Signer[];
   let governanceStaker: Contract;
@@ -163,6 +163,7 @@ describe("GovernanceStaker", function () {
       });
 
       it('should do nothing when earned is zero', async function(){
+        await mine();
         await governanceStaker.connect(accounts[7]).getReward();
       });
     });
@@ -300,6 +301,7 @@ describe("GovernanceStaker", function () {
         await stakingToken.connect(user).approve(governanceStaker.address, amount);
         await governanceStaker.connect(user).stake(amount);
         await increase(86400*10);
+        await mine();
       });
 
       it('should be rewarded for all reward amount', async function(){

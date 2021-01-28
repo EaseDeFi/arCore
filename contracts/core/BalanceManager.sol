@@ -18,9 +18,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     using SafeMath for uint256;
     using SafeMath for uint128;
 
-    // Only thing we use is notifyRewardAmount so make it IRewardManager instead of a GovernanaceStaker contract.
-    IRewardManager public governanceStaker;
-    
     // Wallet of the developers for if a developer fee is being paid.
     address public devWallet;
 
@@ -60,7 +57,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     
     // Block withdrawals within 1 hour of depositing.
     modifier onceAnHour {
-        require(block.timestamp >= lastUserUpdate[msg.sender].add(1 hours), "You must wait an hour after your last update to withdraw.");
+        require(block.timestamp >= balances[msg.sender].lastTime.add(1 hours), "You must wait an hour after your last update to withdraw.");
         _;
     }
 
@@ -71,29 +68,16 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     modifier update(address _user)
     {
         updateBalance(_user);
-        uint256 prevPerSecond = balances[_user].perSecondPrice;
         
         _;
         
         Balance memory balance = balances[_user];
-        uint256 newPerSecond = balance.perSecondPrice;
-        
-        // Record update time.
-        lastUserUpdate[_user] = block.timestamp;
         
         if (balance.perSecondPrice > 0) {
             uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
             BalanceExpireTracker.push(uint160(_user), expiry);
         }
         
-        // No change
-        if (prevPerSecond - newPerSecond == 0) {
-            return;
-        }
-        
-        // Either withdraw or stake depending on change in perSecondPrice.
-        if (newPerSecond > prevPerSecond && ufOn && !arShields[_user]) IRewardManager(getModule("UFB")).stake(_user, newPerSecond.sub(prevPerSecond));
-        else if (ufOn && !arShields[_user]) IRewardManager(getModule("UFB")).withdraw(_user, prevPerSecond.sub(newPerSecond));
     }
 
     /**
@@ -108,7 +92,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
                 address oldHead = address(head);
                 uint256 oldPrice = balances[oldHead].perSecondPrice;
                 BalanceExpireTracker.pop(head);
-                if (ufOn && !arShields[oldHead]) IRewardManager(getModule("UFB")).withdraw(oldHead, oldPrice);
                 updateBalance(oldHead);
         
                 // Remove borrowed amount from PlanManager.        
@@ -152,7 +135,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         require(msg.value > 0, "No Ether was deposited.");
 
         balances[msg.sender].lastBalance = uint128(balances[msg.sender].lastBalance.add(msg.value));
-        balances[msg.sender].lastTime = uint64(block.timestamp);
+        // it is handled in update() function
+        //balances[msg.sender].lastTime = uint64(block.timestamp);
         _notifyBalanceChange(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
@@ -234,11 +218,37 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         emit Loss(_user, loss);
         
         if (newBalance == 0) {
-            balance.perSecondPrice = 0;
-            emit PriceChange(_user, 0);
+            _priceChange(_user, 0);
         }
         
         balances[_user] = balance;
+    }
+
+    /**
+     * @dev handle the user's balance change. this will interact with UFB
+     * @param _user user's address
+     * @param _newPrice user's new per sec price
+     **/
+
+    function _priceChange(address _user, uint64 _newPrice) internal {
+        Balance storage balance = balances[_user];
+        uint64 originalPrice = balance.perSecondPrice;
+        if(originalPrice == _newPrice) {
+            // no need to process
+            return;
+        }
+        if(ufOn && !arShields[_user]) {
+            if(originalPrice > _newPrice) {
+                // price is decreasing
+                IRewardManager(getModule("UFB")).withdraw(_user, originalPrice.sub(_newPrice));
+            } else {
+                // price is increasing
+                IRewardManager(getModule("UFB")).stake(_user, _newPrice.sub(originalPrice));
+            } 
+        }
+        
+        balance.perSecondPrice = _newPrice;
+        emit PriceChange(_user, _newPrice);
     }
 
     /**
@@ -252,8 +262,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       onlyModule("PLAN")
       update(_user)
     {
-        balances[_user].perSecondPrice = _newPrice;
-        emit PriceChange(_user, _newPrice);
+        _priceChange(_user, _newPrice);
     }
 
     /**
@@ -262,15 +271,19 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     function releaseFunds()
       public
     {
-       uint256 govBalance = balances[address(governanceStaker)].lastBalance;
-       balances[address(governanceStaker)].lastBalance = 0;
+       uint256 govBalance = balances[getModule("GOVSTAKE")].lastBalance;
+       // If staking contracts are sent too low of a reward, it can mess up distribution.
+       if (govBalance > 1 ether) {
+           IRewardManager(getModule("GOVSTAKE")).notifyRewardAmount{value: govBalance}(govBalance);
+           balances[getModule("GOVSTAKE")].lastBalance = 0;
+       }
        
        uint256 rewardBalance = balances[getModule("REWARD")].lastBalance;
-       balances[getModule("REWARD")].lastBalance = 0;
-        
        // If staking contracts are sent too low of a reward, it can mess up distribution.
-       if (govBalance > 1 ether) governanceStaker.notifyRewardAmount{value: govBalance}(govBalance);
-       if (rewardBalance > 1 ether) IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
+       if (rewardBalance > 1 ether) {
+           IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
+           balances[getModule("REWARD")].lastBalance = 0;
+       }
     }
 
     function perSecondPrice(address _user)
@@ -302,7 +315,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
             emit AffiliatePaid(referrers[_user], _user, refAmount, block.timestamp);
         }
         if (devAmount > 0) balances[devWallet].lastBalance = uint128( balances[devWallet].lastBalance.add(devAmount) );
-        if (govAmount > 0) balances[address(governanceStaker)].lastBalance = uint128( balances[address(governanceStaker)].lastBalance.add(govAmount) );
+        if (govAmount > 0) balances[getModule("GOVSTAKE")].lastBalance = uint128( balances[getModule("GOVSTAKE")].lastBalance.add(govAmount) );
         if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = uint128( balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount) );
     }
 

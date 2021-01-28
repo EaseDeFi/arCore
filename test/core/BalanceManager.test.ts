@@ -32,6 +32,9 @@ describe("BalanceManager", function () {
     const BalanceFactory = await ethers.getContractFactory("BalanceManager");
     balanceManager = await BalanceFactory.deploy();
     await balanceManager.initialize(master.address, await dev.getAddress());
+    await balanceManager.changeRefPercent(25);
+    await balanceManager.changeDevPercent(25);
+    await balanceManager.changeGovPercent(25);
     await master.connect(owner).registerModule(stringToBytes32("BALANCE"), balanceManager.address);
     await master.connect(owner).addJob(stringToBytes32("BALANCE"));
 
@@ -49,12 +52,14 @@ describe("BalanceManager", function () {
 
     const GovernanceStakerFactory = await ethers.getContractFactory("GovernanceStaker");
     governanceStaker = await GovernanceStakerFactory.deploy(token.address, constants.AddressZero, master.address);
+    await governanceStaker.setRewardDistribution(balanceManager.address);
+    await master.connect(owner).registerModule(stringToBytes32("GOVSTAKE"), governanceStaker.address);
     await rewardManager.initialize(master.address, constants.AddressZero);
 
     const UtilizationFarm = await ethers.getContractFactory("UtilizationFarm");
     utilizationFarm = await UtilizationFarm.deploy();
     await utilizationFarm.initialize(token.address, master.address);
-    await master.connect(owner).registerModule(stringToBytes32("UF"), utilizationFarm.address);
+    await master.connect(owner).registerModule(stringToBytes32("UFB"), utilizationFarm.address);
   });
 
   describe("#initialize()", function() {
@@ -79,6 +84,17 @@ describe("BalanceManager", function () {
       expect(balanceAfter.toString()).to.equal(balanceBefore.add(amount).toString());
     });
 
+    it("should be able to deposit when uf is off", async function(){
+      const newPrice = ethers.BigNumber.from("10000");
+      await planManager.mockChangePrice(balanceManager.address, user.getAddress(), newPrice);
+      await increase(100);
+      await balanceManager.connect(owner).toggleUF();
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
+      await increase(86400);
+      await balanceManager.connect(user).withdraw(amount);
+    });
+
     it("should emit Deposit Event", async function (){
       await expect(balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount})).to.emit(balanceManager, 'Deposit').withArgs((await user.getAddress()), amount.toString());
     });
@@ -89,6 +105,11 @@ describe("BalanceManager", function () {
     beforeEach(async function (){
       await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
       await increase(3600);
+    });
+
+    it("should fail if called twice in an hour", async function(){
+      await balanceManager.connect(user).withdraw(1);
+      await expect(balanceManager.connect(user).withdraw(1)).to.be.revertedWith("You must wait an hour after your last update to withdraw.");
     });
     it("should return balance if amount is larger than balance", async function (){
       await expect(balanceManager.connect(user).withdraw(amount.add(1)));
@@ -120,6 +141,7 @@ describe("BalanceManager", function () {
     it("should update perSecondPrice when updated", async function(){
       await planManager.mockChangePrice(balanceManager.address, await user.getAddress(),newPrice);
       const price = (await balanceManager.balances(user.getAddress())).perSecondPrice;
+      const viewer = await balanceManager.perSecondPrice(user.getAddress());
       expect(price.toString()).to.equal(newPrice.toString());
     });
   });
@@ -151,5 +173,54 @@ describe("BalanceManager", function () {
     });
   });
 
+  describe("#operation functions", function() {
+    const amount = ethers.BigNumber.from("1000000000000000000");
+    it("percent setters cannot set more than Denominator", async function(){
+      await expect(balanceManager.connect(owner).changeDevPercent(10001)).to.be.reverted;
+      await expect(balanceManager.connect(owner).changeRefPercent(10001)).to.be.reverted;
+      await expect(balanceManager.connect(owner).changeGovPercent(10001)).to.be.reverted;
+    });
 
+    describe("releaseFund", async function(){
+      it('should not release if fund is not enough', async function(){
+        await balanceManager.connect(dev).deposit(await referrer.getAddress(), {value:amount});
+        await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
+        await balanceManager.connect(referrer).deposit(await referrer.getAddress(), {value:amount});
+
+        // Change price so it runs out. Referrer runs out first, then user, then dev.
+        await planManager.mockChangePrice(balanceManager.address, await user.getAddress(),amount.div(1000));
+        await planManager.mockChangePrice(balanceManager.address, await dev.getAddress(),amount.div(1000));
+        await planManager.mockChangePrice(balanceManager.address, await referrer.getAddress(),amount.div(1000));
+
+        await increase(86400);
+        // Connect from owner to trigger keep()
+        await balanceManager.connect(owner).deposit(await referrer.getAddress(), {value:amount});
+        await balanceManager.connect(owner).releaseFunds();
+      });
+      
+      it('should release if fund is enough', async function(){
+        await balanceManager.connect(dev).deposit(await referrer.getAddress(), {value:amount});
+        await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
+        await balanceManager.connect(referrer).deposit(await referrer.getAddress(), {value:amount});
+
+        await balanceManager.connect(owner).changeDevPercent(0);
+        await balanceManager.connect(owner).changeRefPercent(500);
+        await balanceManager.connect(owner).changeGovPercent(500);
+        
+        // Change price so it runs out. Referrer runs out first, then user, then dev.
+        await planManager.mockChangePrice(balanceManager.address, await user.getAddress(),amount.div(1000));
+        await planManager.mockChangePrice(balanceManager.address, await dev.getAddress(),amount.div(1000));
+        await planManager.mockChangePrice(balanceManager.address, await referrer.getAddress(),amount.div(1000));
+
+        await increase(86400);
+        // Connect from owner to trigger keep()
+        await balanceManager.connect(owner).deposit(await referrer.getAddress(), {value:amount});
+        await balanceManager.connect(owner).releaseFunds();
+      });
+    });
+
+    it("toggleShield", async function(){
+      await balanceManager.toggleShield(owner.getAddress());
+    })
+  });
 });

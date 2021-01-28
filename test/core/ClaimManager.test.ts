@@ -15,7 +15,8 @@ describe("ClaimManager", function () {
   let claimManager: Contract;
   let stakeManager: Contract;
   let master: Contract;
-  let utilizationFarm: Contract;
+  let ufs: Contract;
+  let ufb: Contract;
 
   let arNFT: Contract;
 
@@ -66,9 +67,12 @@ describe("ClaimManager", function () {
     await claimManager.initialize(master.address);
 
     const UtilizationFarm = await ethers.getContractFactory("UtilizationFarm");
-    utilizationFarm = await UtilizationFarm.deploy();
-    await utilizationFarm.initialize(token.address, master.address);
-    await master.connect(owner).registerModule(stringToBytes32("UF"), utilizationFarm.address);
+    ufs = await UtilizationFarm.deploy();
+    await ufs.initialize(token.address, master.address);
+    await master.connect(owner).registerModule(stringToBytes32("UFS"), ufs.address);
+    ufb = await UtilizationFarm.deploy();
+    await ufb.initialize(token.address, master.address);
+    await master.connect(owner).registerModule(stringToBytes32("UFB"), ufb.address);
   });
 
   describe('#confirmHack()', function(){

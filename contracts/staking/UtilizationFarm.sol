@@ -127,13 +127,12 @@ contract UtilizationFarm is ArmorModule, BalanceWrapper, IRewardDistributionReci
         emit BalanceWithdrawn(user, amount);
     }
 
-    function getReward(address payable user) public updateReward(user) doKeep {
+    function getReward(address user) public updateReward(user) doKeep {
         uint256 reward = earned(user);
         if (reward > 0) {
             rewards[user] = 0;
             
-            if ( address(rewardToken) == address(0) ) user.transfer(reward);
-            else rewardToken.safeTransfer(user, reward);
+            rewardToken.safeTransfer(user, reward);
             
             emit RewardPaid(user, reward);
         }

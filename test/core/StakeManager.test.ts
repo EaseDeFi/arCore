@@ -60,7 +60,7 @@ describe("StakeManager", function () {
     const UtilizationFarm = await ethers.getContractFactory("UtilizationFarm");
     utilizationFarm = await UtilizationFarm.deploy();
     await utilizationFarm.initialize(token.address, master.address);
-    await master.connect(owner).registerModule(stringToBytes32("UF"), utilizationFarm.address);
+    await master.connect(owner).registerModule(stringToBytes32("UFS"), utilizationFarm.address);
   });
 
   describe("#stakeNft()", function(){
@@ -113,6 +113,59 @@ describe("StakeManager", function () {
     });
     it("should be able to stake valid nft", async function(){
       await expect(stakeManager.connect(user).stakeNft(1)).to.emit(stakeManager, 'StakedNFT');
+    });
+    it("should be able to stake when uf is off", async function(){
+      await stakeManager.toggleUF();
+      await expect(stakeManager.connect(user).stakeNft(1)).to.emit(stakeManager, 'StakedNFT');
+    });
+  });
+
+  describe("#withdrawNft()", function(){
+    beforeEach(async function(){
+      await stakeManager.connect(owner).allowProtocol(arNFT.address, true);
+      await arNFT.connect(user).buyCover(
+        arNFT.address,
+        "0x45544800",
+        [100, 10000000000000, 1000, 10000000, 1],
+        10,
+        0,
+        ethers.utils.randomBytes(32),
+        ethers.utils.randomBytes(32)
+      );
+      await arNFT.connect(user).buyCover(
+        arNFT.address,
+        "0x45544800",
+        [100, 10000000000000, 1000, 10000000, 1],
+        10,
+        0,
+        ethers.utils.randomBytes(32),
+        ethers.utils.randomBytes(32)
+      );
+      await arNFT.connect(user).approve(stakeManager.address, 1);
+    });
+    it('should be able to call withdrawNft even uf is off', async function(){
+      await stakeManager.connect(user).stakeNft(1);
+      await stakeManager.connect(user).withdrawNft(1);
+
+      await stakeManager.toggleUF();
+      let stake = await utilizationFarm.balanceOf(user.getAddress());
+      await increase(7 * 86400);
+      await stakeManager.connect(user).withdrawNft(1);
+    });
+    it('do nothing if withdrawal is already queued and had not met withdrawal time', async function(){
+      await stakeManager.connect(user).stakeNft(1);
+      await stakeManager.changeWithdrawalDelay(100);
+      await stakeManager.connect(user).withdrawNft(1);
+
+      let stake = await utilizationFarm.balanceOf(user.getAddress());
+      await stakeManager.connect(user).withdrawNft(1);
+    });
+    it('should be able to withdraw if withdrawal time has met', async function(){
+      await stakeManager.connect(user).stakeNft(1);
+      await stakeManager.connect(user).withdrawNft(1);
+
+      let stake = await utilizationFarm.balanceOf(user.getAddress());
+      await stakeManager.connect(user).withdrawNft(1);
     });
   });
 });

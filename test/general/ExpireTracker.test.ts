@@ -67,7 +67,7 @@ describe("ExpireTracker", function(){
             tail = await tracker.infos(await tracker.tail());
             tailId = await tracker.tail();
             // this will add to the last of the empty bucket
-            await tracker.add(head.expiresAt.sub(1));
+            await tracker.add(head.expiresAt.sub(step));
           });
 
           it("should store expire metadata", async function(){
@@ -75,7 +75,7 @@ describe("ExpireTracker", function(){
             const metadata = await tracker.infos(id);
             expect(metadata.next).to.be.equal(headId);
             expect(metadata.prev).to.be.equal(0);
-            expect(metadata.expiresAt).to.be.equal(head.expiresAt.sub(1));
+            expect(metadata.expiresAt).to.be.equal(head.expiresAt.sub(step));
           });
 
           it("should set head to new id", async function(){
@@ -86,7 +86,7 @@ describe("ExpireTracker", function(){
 
           it("should set bucket head and tail to new id", async function(){
             const id = await tracker.lastId();
-            const bucket = await tracker.checkPoints(getBucket(head.expiresAt.sub(1)));
+            const bucket = await tracker.checkPoints(getBucket(head.expiresAt.sub(step)));
             expect(bucket.head).to.be.equal(id);
             expect(bucket.tail).to.be.equal(id);
           });

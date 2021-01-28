@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { OrderedMerkleTree } from "../utils/Merkle";
-import { increase, getTimestamp } from "../utils";
+import { increase, getTimestamp, mine } from "../utils";
 function stringToBytes32(str: string) : string {
   return ethers.utils.formatBytes32String(str);
 }
@@ -93,7 +93,7 @@ describe("PlanManager", function () {
     
     it("should fail if exceeds protocol limit", async function(){
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.sub(price));
-      await expect(planManager.updatePlan([balanceManager.address], [coverAmount])).to.be.revertedWith("Exceeds total cover amount");
+      await expect(planManager.updatePlan([balanceManager.address], [coverAmount])).to.be.revertedWith("Exceeds allowed cover amount.");
     });
     
     it("should update plan", async function(){
@@ -197,6 +197,7 @@ describe("PlanManager", function () {
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       await increase(plan.end.add(1000).toNumber());
+      await mine();
       const expired = await planManager.getCurrentPlan(await user.getAddress());
       expect(expired[0]).to.be.equal(0);
       expect(expired[1]).to.be.equal(0);

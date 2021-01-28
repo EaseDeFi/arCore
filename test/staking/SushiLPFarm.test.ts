@@ -166,7 +166,7 @@ describe("SushiLPFarm", function () {
       expect(await lpfarm.rewards(address)).to.be.equal(0);
     });
   });
-  describe.only('#getReward()', function(){
+  describe('#getReward()', function(){
     beforeEach(async function(){
       await rewardToken.connect(owner).approve(farmController.address, 1000000);
       await farmController.connect(owner).notifyRewards(1000000);
@@ -201,8 +201,6 @@ describe("SushiLPFarm", function () {
       await lpfarm.connect(user).getReward();
       
       const balance = await sushi.balanceOf(await user.getAddress());
-      console.log(balance.toString());
-      console.log((await sushi.balanceOf(lpfarm.address)).toString());
       expect(earned).to.be.equal(balance);
     });
 

@@ -23,6 +23,8 @@ describe("UtilizationFarm", function () {
   let user: Signer;
   let dev: Signer;
   let referrer: Signer;
+
+  const RewardAmount = BigNumber.from("100000000000");
   beforeEach(async function () {
     accounts = await ethers.getSigners();
     owner = accounts[0];
@@ -66,13 +68,20 @@ describe("UtilizationFarm", function () {
     const UtilizationFarm = await ethers.getContractFactory("UtilizationFarm");
     utilizationFarm = await UtilizationFarm.deploy();
     await utilizationFarm.initialize(token.address, master.address);
-    await master.connect(owner).registerModule(stringToBytes32("UF"), utilizationFarm.address);
+    await master.connect(owner).registerModule(stringToBytes32("UFS"), utilizationFarm.address);
+    // TODO this is not good
+    await master.connect(owner).registerModule(stringToBytes32("UFB"), utilizationFarm.address);
 
     const BalanceFactory = await ethers.getContractFactory("BalanceManager");
     balanceManager = await BalanceFactory.deploy();
     await balanceManager.initialize(master.address, await dev.getAddress());
     await master.connect(owner).registerModule(stringToBytes32("BALANCE"), balanceManager.address);
     await master.connect(owner).addJob(stringToBytes32("BALANCE"));
+    await utilizationFarm.setRewardDistribution(owner.getAddress());
+    await token.approve(utilizationFarm.address, RewardAmount);
+    await utilizationFarm.notifyRewardAmount(RewardAmount);
+    await token.approve(utilizationFarm.address, RewardAmount);
+    await utilizationFarm.notifyRewardAmount(RewardAmount);
   });
 
   describe("#staking", function(){
@@ -169,4 +178,37 @@ describe("UtilizationFarm", function () {
     });
   });
 
+  describe("#getReward()", function(){
+    beforeEach(async function(){
+      await stakeManager.connect(owner).allowProtocol(arNFT.address, true);
+      await arNFT.connect(user).buyCover(
+        arNFT.address,
+        "0x45544800",
+        [100, 10000000000000, 1000, 10000000, 1],
+        10,
+        0,
+        ethers.utils.randomBytes(32),
+        ethers.utils.randomBytes(32)
+      );
+      await arNFT.connect(user).buyCover(
+        arNFT.address,
+        "0x45544800",
+        [100, 10000000000000, 1000, 10000000, 1],
+        10,
+        0,
+        ethers.utils.randomBytes(32),
+        ethers.utils.randomBytes(32)
+      );
+      await arNFT.connect(user).approve(stakeManager.address, 1);
+      await stakeManager.connect(user).stakeNft(1);
+      await token.approve(utilizationFarm.address, RewardAmount);
+      await utilizationFarm.notifyRewardAmount(RewardAmount);
+    });
+
+    it("should be able to get reward", async function(){
+      await increase(86400);
+      await utilizationFarm.connect(user).getReward(user.getAddress());
+      await utilizationFarm.connect(dev).getReward(dev.getAddress());
+    });
+  });
 });

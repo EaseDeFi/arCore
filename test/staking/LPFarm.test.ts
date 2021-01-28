@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { time } from "@openzeppelin/test-helpers";
-import { increase } from "../utils";
+import { increase, mine } from "../utils";
 describe("LPFarm", function () {
   let accounts: Signer[];
   let farmController: Contract;
@@ -163,6 +163,7 @@ describe("LPFarm", function () {
     });
 
     it('should be rewarded for all reward amount', async function(){
+      await mine();
       const earned = await lpfarm.earned(await user.getAddress());
       await lpfarm.connect(user).getReward();
       const balance = await rewardToken.balanceOf(await user.getAddress());
