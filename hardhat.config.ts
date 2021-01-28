@@ -15,7 +15,7 @@ export default {
     rstTitle: "armor-core gas report"
   },
   spdxLicenseIdentifier: {
-    overwrite: true,
+    overwrite: false,
     runOnCompile: true,
   },
   solidity: {
