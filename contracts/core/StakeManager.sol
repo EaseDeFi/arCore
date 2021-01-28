@@ -281,7 +281,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       view
     {
         require(_validUntil > now + 86400, "NFT is expired or within 1 day of expiry.");
-        // TODO: should change this to check status not claimId
+        // TODO: should change this to check status not claimId once we can through Nexus.
         require(_coverStatus == 0, "arNFT claim is already in progress.");
         require(allowedProtocol[_scAddress], "Protocol is not allowed to be staked.");
         require(_coverCurrency == ETH_SIG, "Only Ether arNFTs may be staked.");
