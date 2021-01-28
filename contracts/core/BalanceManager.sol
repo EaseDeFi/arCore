@@ -21,6 +21,13 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     // Wallet of the developers for if a developer fee is being paid.
     address public devWallet;
 
+    // With lastTime and secondPrice we can determine balance by second.
+    struct Balance {
+        uint64 lastTime;
+        uint64 perSecondPrice;
+        uint128 lastBalance;
+    }
+    
     // keep track of monthly payments and start/end of those
     mapping (address => Balance) public balances;
 
@@ -42,18 +49,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     // True if utilization farming is still ongoing
     bool public ufOn;
 
-    // With lastTime and secondPrice we can determine balance by second.
-    struct Balance {
-        uint64 lastTime;
-        uint64 perSecondPrice;
-        uint128 lastBalance;
-    }
-    
     // Mapping of shields so we don't reward them for U.F.
     mapping (address => bool) public arShields;
-
-    // The last time a user has deposited.
-    mapping (address => uint256) public lastUserUpdate;
     
     // Block withdrawals within 1 hour of depositing.
     modifier onceAnHour {
