@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: (c) Armor.Fi DAO, 2021
 
 pragma solidity ^0.6.6;
 
@@ -92,8 +92,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
         
         // Either withdraw or stake depending on change in perSecondPrice.
-        if (newPerSecond > prevPerSecond && ufOn && !arShields[_user]) IRewardManager(getModule("UFB")).stake(_user, newPerSecond.sub(prevPerSecond));
-        else if (ufOn && !arShields[_user]) IRewardManager(getModule("UFB")).withdraw(_user, prevPerSecond.sub(newPerSecond));
+        if (newPerSecond > prevPerSecond && ufOn && !arShields[_user]) IRewardManager(getModule("UF")).stake(_user, newPerSecond.sub(prevPerSecond));
+        else if (ufOn && !arShields[_user]) IRewardManager(getModule("UF")).withdraw(_user, prevPerSecond.sub(newPerSecond));
     }
 
     /**
@@ -108,7 +108,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
                 address oldHead = address(head);
                 uint256 oldPrice = balances[oldHead].perSecondPrice;
                 BalanceExpireTracker.pop(head);
-                if (ufOn && !arShields[oldHead]) IRewardManager(getModule("UFB")).withdraw(oldHead, oldPrice);
+                if (ufOn && !arShields[oldHead]) IRewardManager(getModule("UF")).withdraw(oldHead, oldPrice);
                 updateBalance(oldHead);
         
                 // Remove borrowed amount from PlanManager.        

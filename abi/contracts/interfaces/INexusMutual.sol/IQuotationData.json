@@ -1,0 +1,436 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_add",
+        "type": "address"
+      }
+    ],
+    "name": "getAllCoversOfUser",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "allCover",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAuthQuoteEngine",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "_add",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCoverDetailsByCoverID1",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "cid",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_memberAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_scAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes4",
+        "name": "_currencyCode",
+        "type": "bytes4"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_sumAssured",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "premiumNXM",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCoverDetailsByCoverID2",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "cid",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "sumAssured",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint16",
+        "name": "coverPeriod",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validUntil",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getCoverLength",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "len",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCoverMemberAddress",
+    "outputs": [
+      {
+        "internalType": "address payable",
+        "name": "_add",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCoverPeriod",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "cp",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCoverPremiumNXM",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "_premiumNXM",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCoverStatusNo",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCoverSumAssured",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "sa",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCurrencyOfCover",
+    "outputs": [
+      {
+        "internalType": "bytes4",
+        "name": "curr",
+        "type": "bytes4"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_hcid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getHoldedCoverDetailsByID1",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "hcid",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "scAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes4",
+        "name": "coverCurr",
+        "type": "bytes4"
+      },
+      {
+        "internalType": "uint16",
+        "name": "coverPeriod",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_hcid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getHoldedCoverDetailsByID2",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "hcid",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address payable",
+        "name": "memberAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "coverDetails",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_add",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes4",
+        "name": "_curr",
+        "type": "bytes4"
+      }
+    ],
+    "name": "getTotalSumAssuredSC",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_add",
+        "type": "address"
+      }
+    ],
+    "name": "getUserCoverLength",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "len",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_add",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getUserHoldedCoverByIndex",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_add",
+        "type": "address"
+      }
+    ],
+    "name": "getUserHoldedCoverLength",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getValidityOfCover",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "date",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cid",
+        "type": "uint256"
+      }
+    ],
+    "name": "getscAddressOfCover",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

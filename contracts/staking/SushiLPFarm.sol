@@ -1,7 +1,4 @@
-// SPDX-License-Identifier: MIT
-
-
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: (c) Armor.Fi DAO, 2021
 
 pragma solidity ^0.6.6;
 import '../interfaces/IMasterChef.sol';
