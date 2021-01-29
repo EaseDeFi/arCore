@@ -9,6 +9,8 @@ import '../interfaces/IERC20.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
+import '../interfaces/IUtilizationFarm.sol';
+
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -237,10 +239,10 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         if(ufOn && !arShields[_user]) {
             if(originalPrice > _newPrice) {
                 // price is decreasing
-                IRewardManager(getModule("UFB")).withdraw(_user, originalPrice.sub(_newPrice));
+                IUtilizationFarm(getModule("UFB")).withdraw(_user, originalPrice.sub(_newPrice));
             } else {
                 // price is increasing
-                IRewardManager(getModule("UFB")).stake(_user, _newPrice.sub(originalPrice));
+                IUtilizationFarm(getModule("UFB")).stake(_user, _newPrice.sub(originalPrice));
             } 
         }
         
@@ -381,3 +383,4 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         arShields[_shield] = !arShields[_shield];
     }
 }
+

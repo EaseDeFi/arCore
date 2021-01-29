@@ -11,6 +11,7 @@ import '../interfaces/IRewardManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
 import '../interfaces/IStakeManager.sol';
+import '../interfaces/IUtilizationFarm.sol';
 
 /**
  * @dev Encompasses all functions taken by stakers.
@@ -64,8 +65,8 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       override
     {
         initializeModule(_armorMaster);
-        // Let's be explicit. Testnet will have 0 to easily adjust stakers.
-        withdrawalDelay = 0;
+        // Let's be explicit.
+        withdrawalDelay = 7 days;
         ufOn = true;
     }
 
@@ -194,10 +195,10 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         nftOwners[_nftId] = _user;
 
         uint256 weiSumAssured = sumAssured * (10 ** 18);
-        _addCovers(_user, weiSumAssured, secondPrice, scAddress);
+        _addCovers(_user, _nftId, weiSumAssured, secondPrice, scAddress);
         
         // Add to utilization farming.
-        if (ufOn) IRewardManager(getModule("UFS")).stake(_user, secondPrice);
+        if (ufOn) IUtilizationFarm(getModule("UFS")).stake(_user, secondPrice);
         
         emit StakedNFT(_user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
     }
@@ -232,7 +233,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         _subtractCovers(user, _nftId, weiSumAssured, secondPrice, scAddress);
         
         // Exit from utilization farming.
-        if (ufOn) IRewardManager(getModule("UFS")).withdraw(user, secondPrice);
+        if (ufOn) IUtilizationFarm(getModule("UFS")).withdraw(user, secondPrice);
 
         // Returns the caller some gas as well as ensure this function cannot be called again.
         delete nftOwners[_nftId];
@@ -243,14 +244,15 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     /**
      * @dev Add to the cover amount for the user and contract overall.
      * @param _user The user who submitted.
+     * @param _nftId ID of the NFT being staked (used for events on RewardManager).
      * @param _coverAmount The amount of cover being added.
      * @param _coverPrice Price paid by the user for the NFT per second.
      * @param _protocol Address of the protocol that is having cover added.
     **/
-    function _addCovers(address _user, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
+    function _addCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        IRewardManager(getModule("REWARD")).stake(_user, _coverPrice);
+        IRewardManager(getModule("REWARD")).stake(_user, _coverPrice, _nftId);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
     }
     
@@ -265,7 +267,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     function _subtractCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        IRewardManager(getModule("REWARD")).withdraw(_user, _coverPrice);
+        IRewardManager(getModule("REWARD")).withdraw(_user, _coverPrice, _nftId);
         if (!submitted[_nftId]) totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     

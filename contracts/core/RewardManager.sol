@@ -44,8 +44,8 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
 
     // Reward token is 0 if Ether is the reward.
     IERC20 public rewardToken;
-    address public stakeManager;
-    uint256 public constant DURATION = 7 days;
+    // address public stakeManager;
+    uint256 public constant DURATION = 1;
 
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
@@ -54,10 +54,10 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
-    event RewardAdded(uint256 reward);
-    event BalanceAdded(address indexed user, uint256 amount);
-    event BalanceWithdrawn(address indexed user, uint256 amount);
-    event RewardPaid(address indexed user, uint256 reward);
+    event RewardAdded(uint256 reward, uint256 totalSupply, uint256 timestamp);
+    event BalanceAdded(address indexed user, uint256 indexed nftId, uint256 amount, uint256 totalSupply, uint256 timestamp);
+    event BalanceWithdrawn(address indexed user, uint256 indexed nftId, uint256 amount, uint256 totalSupply, uint256 timestamp);
+    event RewardPaid(address indexed user, uint256 reward, uint256 timestamp);
 
     modifier updateReward(address account) {
         rewardPerTokenStored = rewardPerToken();
@@ -73,7 +73,7 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
       external
       override
     {
-        require(address(stakeManager) == address(0), "Contract is already initialized.");
+        // require(address(stakeManager) == address(0), "Contract is already initialized.");
         initializeModule(_armorMaster);
         rewardToken = IERC20(_rewardToken);
     }
@@ -105,14 +105,14 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address user, uint256 amount) external override onlyModule("STAKE") updateReward(user) doKeep {
-        _addStake(user, amount);
-        emit BalanceAdded(user, amount);
+    function stake(address _user, uint256 _amount, uint256 _nftId) external override onlyModule("STAKE") updateReward(_user) doKeep {
+        _addStake(_user, _amount);
+        emit BalanceAdded(_user, _nftId, _amount, totalSupply(), block.timestamp);
     }
 
-    function withdraw(address user, uint256 amount) public override onlyModule("STAKE") updateReward(user) doKeep {
-        _removeStake(user, amount);
-        emit BalanceWithdrawn(user, amount);
+    function withdraw(address _user, uint256 _amount, uint256 _nftId) public override onlyModule("STAKE") updateReward(_user) doKeep {
+        _removeStake(_user, _amount);
+        emit BalanceWithdrawn(_user, _nftId, _amount, totalSupply(), block.timestamp);
     }
 
     function getReward(address payable user) public override updateReward(user) doKeep {
@@ -123,7 +123,7 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
             if ( address(rewardToken) == address(0) ) user.transfer(reward);
             else rewardToken.safeTransfer(user, reward);
             
-            emit RewardPaid(user, reward);
+            emit RewardPaid(user, reward, block.timestamp);
         }
     }
 
@@ -152,6 +152,6 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
         }
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp.add(DURATION);
-        emit RewardAdded(reward);
+        emit RewardAdded(reward, totalSupply(), block.timestamp);
     }
 }
