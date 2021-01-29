@@ -82,64 +82,67 @@ describe("RewardManager", function () {
   });
 
   describe('#stake()', function(){
+    const NFTID = 1;
     beforeEach(async function(){
       await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
       await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
       await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
     });
     it('should fail if msg.sender is not stake manager', async function(){
-      await expect(rewardManager.connect(owner).stake(await user.getAddress(), amount)).to.be.revertedWith('only module STAKE can call this function');
+      await expect(rewardManager.connect(owner).stake(await user.getAddress(), amount, NFTID)).to.be.revertedWith('only module STAKE can call this function');
     });
 
     it('should increase total supply', async function(){
-      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
+      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount, NFTID);
       expect(await rewardManager.totalSupply()).to.be.equal(amount);
     });
 
     it('should increase balanceOf user', async function(){
       const address = await user.getAddress();
-      await rewardManager.connect(stakeManager).stake(address, amount);
+      await rewardManager.connect(stakeManager).stake(address, amount, NFTID);
       expect(await rewardManager.balanceOf(address)).to.be.equal(amount);
     });
   });
   
   describe('#withdraw()', function(){
+    const NFTID = 1;
     beforeEach(async function(){
       await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
       await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
-      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
+      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount, NFTID);
       await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
       await increase(100);
     });
 
     it('should fail if msg.sender is not stake manager', async function(){
-      await expect(rewardManager.connect(owner).withdraw(await user.getAddress(), amount)).to.be.revertedWith('only module STAKE can call this function');
+      await expect(rewardManager.connect(owner).withdraw(await user.getAddress(), amount, NFTID)).to.be.revertedWith('only module STAKE can call this function');
     });
 
     it('should decrease total supply', async function(){
-      await rewardManager.connect(stakeManager).withdraw(await user.getAddress(), amount);
+      await rewardManager.connect(stakeManager).withdraw(await user.getAddress(), amount, NFTID);
       expect(await rewardManager.totalSupply()).to.be.equal(0);
     });
 
     it('should decrease balanceOf user', async function(){
       const address = await user.getAddress();
-      await rewardManager.connect(stakeManager).withdraw(address, amount);
+      await rewardManager.connect(stakeManager).withdraw(address, amount, NFTID);
       expect(await rewardManager.balanceOf(address)).to.be.equal(0);
     });
 
     it('should not decrease reward amount', async function(){
       const address = await user.getAddress();
-      await rewardManager.connect(stakeManager).withdraw(address, amount);
+      await rewardManager.connect(stakeManager).withdraw(address, amount, NFTID);
       expect(await rewardManager.rewards(address)).to.not.equal(0);
     });
   });
   
   describe('#getReward()', function(){
+    const NFTID = 1;
     beforeEach(async function(){
       await token.connect(owner).mint(await rewardDistribution.getAddress(), rewardAmount);
       await token.connect(rewardDistribution).approve(rewardManager.address, rewardAmount);
       await rewardManager.connect(rewardDistribution).notifyRewardAmount(rewardAmount);
-      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount);
+      await rewardManager.connect(stakeManager).stake(await user.getAddress(), amount, NFTID);
       await increase(86400*10);
       await mine();
     });
