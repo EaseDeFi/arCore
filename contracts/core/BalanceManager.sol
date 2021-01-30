@@ -272,14 +272,14 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
        uint256 govBalance = balances[getModule("GOVSTAKE")].lastBalance;
        // If staking contracts are sent too low of a reward, it can mess up distribution.
-       if (govBalance > 1 ether) {
+       if (govBalance >= 1 ether / 10) {
            IRewardManager(getModule("GOVSTAKE")).notifyRewardAmount{value: govBalance}(govBalance);
            balances[getModule("GOVSTAKE")].lastBalance = 0;
        }
        
        uint256 rewardBalance = balances[getModule("REWARD")].lastBalance;
        // If staking contracts are sent too low of a reward, it can mess up distribution.
-       if (rewardBalance > 1 ether) {
+       if (rewardBalance >= 1 ether / 10) {
            IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
            balances[getModule("REWARD")].lastBalance = 0;
        }
