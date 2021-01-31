@@ -129,6 +129,14 @@ describe("PlanManager", function () {
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       await planManager.connect(user).updatePlan([balanceManager.address, stakeManager.address,], [coverAmount, coverAmount.sub(price)]);
     });
+    
+    it("should be able to cancel all plans when there is currenct plan", async function(){
+      await stakeManager.mockSetPlanManagerPrice(stakeManager.address, price);
+      await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
+      await stakeManager.mockLimitSetter(stakeManager.address, coverAmount.mul(10));
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
+      await planManager.connect(user).updatePlan([], []);
+    });
   });
 
   describe('#updateExpireTime()', function(){
