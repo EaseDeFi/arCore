@@ -58,10 +58,8 @@ contract ClaimManager is ArmorModule, IClaimManager {
         (uint256 planIndex, bool covered) = IPlanManager(getModule("PLAN")).checkCoverage(msg.sender, _protocol, _hackTime, _amount);
         require(covered, "User does not have valid amount, check path and amount");
         
-        // Put Ether into 18 decimal format.
-        uint256 payment = _amount * 10 ** 18;
         IPlanManager(getModule("PLAN")).planRedeemed(msg.sender, planIndex, _protocol);
-        msg.sender.transfer(payment);
+        msg.sender.transfer(_amount);
         
         emit ClaimPayout(hackId, msg.sender, _amount);
     }

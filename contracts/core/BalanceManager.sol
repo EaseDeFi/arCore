@@ -89,7 +89,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
-                uint256 oldPrice = balances[oldHead].perSecondPrice;
                 BalanceExpireTracker.pop(head);
                 updateBalance(oldHead);
         

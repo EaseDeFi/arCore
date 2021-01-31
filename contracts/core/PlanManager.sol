@@ -26,7 +26,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     mapping (bytes32 => ProtocolPlan) public protocolPlan;
     
     // StakeManager calls this when a new NFT is added to update what the price for that protocol is.
-    // Cover price in ETH (1e18) of price per second per DAI covered.
+    // Cover price in ETH (1e18) of price per second per ETH covered.
     mapping (address => uint256) public nftCoverPrice;
     
     // Mapping to doKeep track of how much coverage we've sold for each protocol.
@@ -119,7 +119,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         for (uint256 i = 0; i < _protocols.length; i++) {
             require(nftCoverPrice[_protocols[i]] != 0, "Protocol price is zero");
             
-            // nftCoverPrice is per full Ether, so a cover amont in Wei must be divided by 18 decimals after.
+            // nftCoverPrice is Wei per second per full Ether, so a cover amont in Wei must be divided by 18 decimals after.
             uint256 pricePerSec = nftCoverPrice[ _protocols[i] ].mul(_coverAmounts[i]);
             newPricePerSec = newPricePerSec.add(pricePerSec);
         }
