@@ -56,7 +56,7 @@ contract ClaimManager is ArmorModule, IClaimManager {
         // Gets the coverage amount of the user at the time the hack happened.
         // TODO check if plan is not active now => to prevent users paying more than needed
         (uint256 planIndex, bool covered) = IPlanManager(getModule("PLAN")).checkCoverage(msg.sender, _protocol, _hackTime, _amount);
-        require(covered, "User does not have valid amount, check path and amount");
+        require(covered, "User does not have cover for hack");
         
         IPlanManager(getModule("PLAN")).planRedeemed(msg.sender, planIndex, _protocol);
         msg.sender.transfer(_amount);
@@ -134,4 +134,17 @@ contract ClaimManager is ArmorModule, IClaimManager {
         confirmedHacks[hackId] = true;
         emit ConfirmedHack(hackId, _protocol, _hackTime);
     }
+
+    /**
+     * @dev ExchangeManager may withdraw Ether from ClaimManager to then exchange for wNXM then deposit to arNXM vault.
+     * @param _amount Amount in Wei to send to ExchangeManager.
+    **/
+    function exchangeWithdrawal(uint256 _amount)
+      external
+      override
+      onlyModule("EXCHANGE")
+    {
+        msg.sender.transfer(_amount);
+    }
+
 }
