@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer } from "ethers";
-import { OrderedMerkleTree } from "./utils/Merkle";
+import { OrderedMerkleTree } from "./Merkle";
 function randomBytes32(length: number) : Uint8Array[] {
   let arrays = new Array<Uint8Array>();
   for(let i = 0 ; i < length ; i++){

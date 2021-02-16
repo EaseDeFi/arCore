@@ -9,7 +9,7 @@ import '../interfaces/IClaimManager.sol';
 import '../interfaces/INexusMutual.sol';
 import '../interfaces/IBalancer.sol';
 import '../interfaces/IUniswap.sol';
-
+import '../interfaces/IWETH.sol';
 /**
  * ExchangeManager contract enables us to slowly exchange excess claim funds for wNXM then transfer to the arNXM vault. 
 **/
@@ -72,13 +72,15 @@ contract ExchangeManager is ArmorModule {
         _exchangeAndSendToVault(address(SUSHI_ROUTER), _minReturn, _path);
     }
 
-    function buyWNXMBalancer(uint256 _amount, address _bpool, uint256 _minReturn, uint256 _maxPrice)
+    function buyWNxmBalancer(uint256 _amount, address _bpool, uint256 _minReturn, uint256 _maxPrice)
       external
       onlyOwner
     {
         require(BALANCER_FACTORY.isBPool(_bpool), "NOT_BPOOL");
         _requestFunds(_amount);
         uint256 balance = address(this).balance;
+        IWETH(address(WETH)).deposit{value:balance}();
+        WETH.approve(_bpool, balance);
         IBPool(_bpool).swapExactAmountIn(address(WETH), balance, address(WNXM), _minReturn, _maxPrice);
         _transferWNXM();
         ARNXM_VAULT.unwrapWnxm();

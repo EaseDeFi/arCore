@@ -47,7 +47,11 @@ export default {
         accountsBalance: "1000000000000000000000000"
       },
       allowUnlimitedContractSize: true,
-      timeout: 1000000
+      timeout: 1000000,
+      forking: {
+        url: "https://eth-mainnet.alchemyapi.io/v2/90dtUWHmLmwbYpvIeC53UpAICALKyoIu",
+        blockNumber: 11861166
+      }
     },
     coverage: {
       url: 'http://localhost:8555'
