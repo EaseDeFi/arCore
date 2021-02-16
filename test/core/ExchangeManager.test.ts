@@ -30,7 +30,7 @@ describe.only("ExchangeManager", function () {
     await master.connect(owner).registerModule(stringToBytes32("CLAIM"), claimManager.address);
     
     const ExchangeFactory = await ethers.getContractFactory("ExchangeManager");
-    exchangeManager = await ExchangeFactory.deploy("0x1337DEF1FC06783D4b03CB8C1Bf3EBf7D0593FC4", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "0x0d438F3b5175Bebc262bF23753C1E53d03432bDE","0x01bfd82675dbcc7762c84019ca518e701c0cd07e", "0x9424B1412450D0f8Fc2255FAf6046b98213B76Bd", "0x7a250d5630b4cf539739df2c5dacb4c659f2488d", "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f");
+    exchangeManager = await ExchangeFactory.deploy();
     await exchangeManager.initialize(master.address);
     
     const kycAuthAddress = "0x176c27973e0229501d049de626d50918dda24656";

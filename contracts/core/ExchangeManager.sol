@@ -15,23 +15,13 @@ import '../interfaces/IWETH.sol';
 **/
 contract ExchangeManager is ArmorModule {
     
-    IARNXMVault public immutable ARNXM_VAULT; // = 0x1337DEF1FC06783D4b03CB8C1Bf3EBf7D0593FC4;
-    IERC20 public immutable WETH; //=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
-    IERC20 public immutable WNXM; //= IERC20(0x0d438F3b5175Bebc262bF23753C1E53d03432bDE);
-    INXMMaster public immutable NXM_MASTER;
-    IBFactory public immutable BALANCER_FACTORY;
-    IUniswapV2Router02 public immutable UNI_ROUTER;
-    IUniswapV2Router02 public immutable SUSHI_ROUTER;
-   
-    constructor(address _arnxmvault,address _weth, address _wnxm, address _nxm_master, address _bfactory, address _uni, address _sushi) public {
-        ARNXM_VAULT = IARNXMVault(_arnxmvault);
-        WETH = IERC20(_weth);
-        WNXM = IERC20(_wnxm);
-        NXM_MASTER = INXMMaster(_nxm_master);
-        BALANCER_FACTORY = IBFactory(_bfactory);
-        UNI_ROUTER = IUniswapV2Router02(_uni);
-        SUSHI_ROUTER = IUniswapV2Router02(_sushi);
-    }
+    IARNXMVault public constant ARNXM_VAULT = IARNXMVault(0x1337DEF1FC06783D4b03CB8C1Bf3EBf7D0593FC4);
+    IERC20 public constant WETH = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    IERC20 public constant WNXM = IERC20(0x0d438F3b5175Bebc262bF23753C1E53d03432bDE);
+    INXMMaster public constant NXM_MASTER = INXMMaster(0x01BFd82675DBCc7762C84019cA518e701C0cD07e);
+    IBFactory public constant BALANCER_FACTORY = IBFactory(0x9424B1412450D0f8Fc2255FAf6046b98213B76Bd);
+    IUniswapV2Router02 public constant UNI_ROUTER = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    IUniswapV2Router02 public constant SUSHI_ROUTER = IUniswapV2Router02(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
     // ClaimManager will be sending Ether to this contract.
     receive() external payable { }
