@@ -11,7 +11,8 @@ import '../interfaces/IBalancer.sol';
 import '../interfaces/IUniswap.sol';
 import '../interfaces/IWETH.sol';
 /**
- * ExchangeManager contract enables us to slowly exchange excess claim funds for wNXM then transfer to the arNXM vault. 
+ * @title ExchangeManager
+ * @dev ExchangeManager contract enables us to slowly exchange excess claim funds for wNXM then transfer to the arNXM vault.
 **/
 contract ExchangeManager is ArmorModule {
     
