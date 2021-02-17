@@ -15,6 +15,7 @@ import '../interfaces/IWETH.sol';
 **/
 contract ExchangeManager is ArmorModule {
     
+    address public exchanger;
     IARNXMVault public constant ARNXM_VAULT = IARNXMVault(0x1337DEF1FC06783D4b03CB8C1Bf3EBf7D0593FC4);
     IERC20 public constant WETH = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     IERC20 public constant WNXM = IERC20(0x0d438F3b5175Bebc262bF23753C1E53d03432bDE);
@@ -23,6 +24,12 @@ contract ExchangeManager is ArmorModule {
     IUniswapV2Router02 public constant UNI_ROUTER = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
     IUniswapV2Router02 public constant SUSHI_ROUTER = IUniswapV2Router02(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
+    // Address allowed to exchange tokens.
+    modifier onlyExchanger {
+        require(msg.sender == exchanger, "Sender is not approved to exchange.");
+        _;
+    }
+
     // ClaimManager will be sending Ether to this contract.
     receive() external payable { }
     
@@ -30,10 +37,11 @@ contract ExchangeManager is ArmorModule {
      * @dev Initialize master for the contract. Owner must also add module for ExchangeManager to master upon deployment.
      * @param _armorMaster Address of the ArmorMaster contract.
     **/
-    function initialize(address _armorMaster)
+    function initialize(address _armorMaster, address _exchanger)
       external
     {
         initializeModule(_armorMaster);
+        exchanger = _exchanger;
     }
     
     /**
@@ -43,7 +51,7 @@ contract ExchangeManager is ArmorModule {
     **/
     function buyWNxmUni(uint256 _amount, uint256 _minReturn, address[] memory _path)
       external
-      onlyOwner
+      onlyExchanger
     {
         _requestFunds(_amount);
         _exchangeAndSendToVault(address(UNI_ROUTER), _minReturn, _path);
@@ -56,7 +64,7 @@ contract ExchangeManager is ArmorModule {
     **/
     function buyWNxmSushi(uint256 _amount, uint256 _minReturn, address[] memory _path)
       external
-      onlyOwner
+      onlyExchanger
     {
         _requestFunds(_amount);
         _exchangeAndSendToVault(address(SUSHI_ROUTER), _minReturn, _path);
@@ -64,7 +72,7 @@ contract ExchangeManager is ArmorModule {
 
     function buyWNxmBalancer(uint256 _amount, address _bpool, uint256 _minReturn, uint256 _maxPrice)
       external
-      onlyOwner
+      onlyExchanger
     {
         require(BALANCER_FACTORY.isBPool(_bpool), "NOT_BPOOL");
         _requestFunds(_amount);
@@ -83,7 +91,7 @@ contract ExchangeManager is ArmorModule {
     **/
     function buyNxm(uint256 _ethAmount, uint256 _minNxm)
       external
-      onlyOwner
+      onlyExchanger
     {
         _requestFunds(_ethAmount);
         INXMPool pool = INXMPool(NXM_MASTER.getLatestAddress("P1"));
@@ -134,4 +142,16 @@ contract ExchangeManager is ArmorModule {
         uint256 nxmBalance = NXM.balanceOf( address(this) );
         NXM.transfer(address(ARNXM_VAULT), nxmBalance);
     }
+    
+    /**
+     * @dev Owner may change the address allowed to exchange tokens.
+     * @param _newExchanger New address to make exchanger.
+    **/
+    function changeExchanger(address _newExchanger)
+      external
+      onlyOwner
+    {
+        exchanger = _newExchanger;
+    }
+    
 }

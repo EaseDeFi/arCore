@@ -31,7 +31,7 @@ describe.only("ExchangeManager", function () {
     
     const ExchangeFactory = await ethers.getContractFactory("ExchangeManager");
     exchangeManager = await ExchangeFactory.deploy();
-    await exchangeManager.initialize(master.address);
+    await exchangeManager.initialize(master.address,owner.getAddress());
     
     const kycAuthAddress = "0x176c27973e0229501d049de626d50918dda24656";
     await hre.network.provider.request({
