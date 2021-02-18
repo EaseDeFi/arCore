@@ -4,4 +4,5 @@ pragma solidity ^0.6.0;
 
 interface IARNXMVault {
     function unwrapWnxm() external;
+    function buyNxmWithEther(uint256 _minAmount) external payable;
 }

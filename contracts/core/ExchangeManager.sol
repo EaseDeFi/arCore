@@ -10,9 +10,9 @@ import '../interfaces/INexusMutual.sol';
 import '../interfaces/IBalancer.sol';
 import '../interfaces/IUniswap.sol';
 import '../interfaces/IWETH.sol';
+
 /**
- * @title ExchangeManager
- * @dev ExchangeManager contract enables us to slowly exchange excess claim funds for wNXM then transfer to the arNXM vault.
+ * ExchangeManager contract enables us to slowly exchange excess claim funds for wNXM then transfer to the arNXM vault. 
 **/
 contract ExchangeManager is ArmorModule {
     
@@ -95,9 +95,7 @@ contract ExchangeManager is ArmorModule {
       onlyExchanger
     {
         _requestFunds(_ethAmount);
-        INXMPool pool = INXMPool(NXM_MASTER.getLatestAddress("P1"));
-        pool.buyNXM{value:_ethAmount}(_minNxm);
-        _transferNXM();
+        ARNXM_VAULT.buyNxmWithEther{value:_ethAmount}(_minNxm);
     }
 
     /**
