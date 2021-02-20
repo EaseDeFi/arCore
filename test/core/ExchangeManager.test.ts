@@ -5,7 +5,7 @@ import { increase } from "../utils";
 function stringToBytes32(str: string) : string {
   return ethers.utils.formatBytes32String(str);
 }
-describe.only("ExchangeManager", function () {
+describe.skip("ExchangeManager", function () {
   let accounts: Signer[];
   let master: Contract;
   let claimManager: Contract;

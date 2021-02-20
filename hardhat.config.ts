@@ -48,10 +48,6 @@ export default {
       },
       allowUnlimitedContractSize: true,
       timeout: 1000000,
-      forking: {
-        url: "https://eth-mainnet.alchemyapi.io/v2/90dtUWHmLmwbYpvIeC53UpAICALKyoIu",
-        blockNumber: 11861166
-      }
     },
     coverage: {
       url: 'http://localhost:8555'
