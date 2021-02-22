@@ -75,8 +75,8 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
     function keep() external {
-        // Restrict each keep to 3 removals max.
-        for (uint256 i = 0; i < 3; i++) {
+        // Restrict each keep to 2 removals max.
+        for (uint256 i = 0; i < 2; i++) {
             
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
             else return;
@@ -123,6 +123,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         // Check when this NFT is allowed to be withdrawn. If 0, set it.
         uint256 withdrawalTime = pendingWithdrawals[_nftId];
         
+        // TODO: Add check if it takes balance below used.
         if (withdrawalTime == 0) {
             withdrawalTime = block.timestamp + withdrawalDelay;
             pendingWithdrawals[_nftId] = withdrawalTime;

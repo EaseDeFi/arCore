@@ -16,8 +16,8 @@ contract BalanceExpireTracker {
     // Don't want to keep typing address(0). Typecasting just for clarity.
     uint160 private constant EMPTY = uint160(address(0));
     
-    // 1 day for each step.
-    uint64 public constant BUCKET_STEP = 86400;
+    // 1 week for each step.
+    uint64 public constant BUCKET_STEP = 7 days;
 
     // indicates where to start from 
     // points where TokenInfo with (expiredAt / BUCKET_STEP) == index

@@ -66,7 +66,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      **/
     modifier update(address _user)
     {
-        updateBalance(_user);
+        _updateBalance(_user);
         
         _;
         
@@ -84,16 +84,16 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
     function keep() external {
-        // Restrict each keep to 3 removes max.
-        for (uint256 i = 0; i < 3; i++) {
+        // Restrict each keep to 2 removes max.
+        for (uint256 i = 0; i < 2; i++) {
         
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
                 BalanceExpireTracker.pop(head);
-                updateBalance(oldHead);
+                _updateBalance(oldHead);
         
                 // Remove borrowed amount from PlanManager.        
-                _notifyBalanceChange(msg.sender);
+                _notifyBalanceChange(oldHead);
             } else return;
             
         }
@@ -196,8 +196,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      * @dev Update a borrower's balance to it's adjusted amount.
      * @param _user The address to be updated.
      **/
-    function updateBalance(address _user)
-      public
+    function _updateBalance(address _user)
+      internal
       override
     {
         Balance memory balance = balances[_user];

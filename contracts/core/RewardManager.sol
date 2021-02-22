@@ -45,7 +45,7 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
     // Reward token is 0 if Ether is the reward.
     IERC20 public rewardToken;
     // address public stakeManager;
-    uint256 public constant DURATION = 1;
+    uint256 public constant DURATION = 1 days;
 
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
