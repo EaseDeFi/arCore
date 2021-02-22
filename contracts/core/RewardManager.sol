@@ -105,12 +105,12 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(address _user, uint256 _amount, uint256 _nftId) external override onlyModule("STAKE") updateReward(_user) doKeep {
+    function stake(address _user, uint256 _amount, uint256 _nftId) external override onlyModule("STAKE") updateReward(_user) {
         _addStake(_user, _amount);
         emit BalanceAdded(_user, _nftId, _amount, totalSupply(), block.timestamp);
     }
 
-    function withdraw(address _user, uint256 _amount, uint256 _nftId) public override onlyModule("STAKE") updateReward(_user) doKeep {
+    function withdraw(address _user, uint256 _amount, uint256 _nftId) public override onlyModule("STAKE") updateReward(_user) {
         _removeStake(_user, _amount);
         emit BalanceWithdrawn(_user, _nftId, _amount, totalSupply(), block.timestamp);
     }

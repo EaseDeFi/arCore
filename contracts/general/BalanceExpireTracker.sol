@@ -171,8 +171,10 @@ contract BalanceExpireTracker {
         uint64 expiresAt = infos[expireId].expiresAt;
         uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         // check if bucket is empty
-        // if bucket is empty, reverts
-        require(checkPoints[bucket].head != EMPTY, "Info does not exist: Bucket empty");
+        // if bucket is empty, end
+        if(checkPoints[bucket].head == EMPTY){
+            return;
+        }
         // if bucket is not empty, iterate through
         // if expiresAt of current cursor is larger than expiresAt of parameter, reverts
         for(uint160 cursor = checkPoints[bucket].head; infos[cursor].expiresAt <= expiresAt; cursor = infos[cursor].next) {

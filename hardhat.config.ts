@@ -10,9 +10,6 @@ export default {
     enabled: true,
     currency: "USD",
     gasPrice: 100,
-    outputFile: "gasReport.txt",
-    rst: true,
-    rstTitle: "armor-core gas report"
   },
   spdxLicenseIdentifier: {
     overwrite: false,

@@ -198,7 +198,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      **/
     function _updateBalance(address _user)
       internal
-      override
     {
         Balance memory balance = balances[_user];
 
@@ -246,6 +245,12 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
         
         balance.perSecondPrice = _newPrice;
+        if(_newPrice == 0) {
+            BalanceExpireTracker.pop(uint160(_user));
+        }
+        else {
+            BalanceExpireTracker.push(uint160(_user), uint64(balance.lastBalance.div(_newPrice)));
+        }
         emit PriceChange(_user, _newPrice);
     }
 
