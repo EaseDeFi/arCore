@@ -130,7 +130,7 @@ describe("UtilizationFarm", function () {
       await stakeManager.connect(user).withdrawNft(1);
 
       let stake = await utilizationFarm.balanceOf(user.getAddress());
-      expect(stake.toString()).to.equal("11574074");
+      expect(stake.toString()).to.equal("0");
 
       await increase(7 * 86400);
       await stakeManager.connect(user).withdrawNft(1);

@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { getTimestamp, increase } from "../utils";
-let step = BigNumber.from("86400");
+let step = BigNumber.from("259200");
 function getBucket(expire: BigNumber) : BigNumber {
   return (expire.div(step)).mul(step);
 }
@@ -87,8 +87,6 @@ describe("BalanceExpireTracker", function(){
           it("should set bucket head and tail to new id", async function(){
             const id = await tracker.lastId();
             const bucket = await tracker.checkPoints(getBucket(head.expiresAt.sub(step)));
-            console.log(bucket);
-            console.log(head.expiresAt.toString());
             expect(bucket.head).to.be.equal(id);
             expect(bucket.tail).to.be.equal(id);
           });

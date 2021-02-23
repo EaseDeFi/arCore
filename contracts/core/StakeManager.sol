@@ -123,7 +123,8 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
             require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
             
             (/*coverId*/,  uint8 coverStatus, uint256 sumAssured, /*uint16 coverPeriod*/, /*uint256 validUntil*/, address scAddress, 
-            /*bytes4 coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+            /*bytes4 coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT( getModule("ARNFT") ).getToken(_nftId);
+            
             uint256 totalUsedCover = IPlanManager( getModule("PLAN") ).totalUsedCover(scAddress);
             bool withdrawable = totalUsedCover <= totalStakedAmount[scAddress].sub(sumAssured * 1e18);
             require(coverStatus == 0 && withdrawable, "May not withdraw NFT if it will bring staked amount below borrowed amount.");
@@ -133,17 +134,16 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
             _removeNft(_nftId);
             
             emit WithdrawRequest(msg.sender, _nftId, block.timestamp, withdrawalTime);
-            return;
-        } else if (withdrawalTime > block.timestamp) {
-            return;
-        } else {
+        } else if (withdrawalTime <= block.timestamp) {
             (/*coverId*/,  uint8 coverStatus, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, /*uint256 validUntil*/, /*address scAddress*/, 
             /*bytes4 coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+            
             require(coverStatus == 0, "May not withdraw while claim is occurring.");
             
-            _removeNft(_nftId);
-            IClaimManager(getModule("CLAIM")).transferNft(msg.sender, _nftId);
+            address nftOwner = nftOwners[_nftId];
+            IClaimManager(getModule("CLAIM")).transferNft(nftOwner, _nftId);
             delete pendingWithdrawals[_nftId];
+            delete nftOwners[_nftId];
         }
         
     }
@@ -186,7 +186,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       internal
     {
         (/*coverId*/,  uint8 coverStatus, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress, 
-         bytes4 coverCurrency, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+         bytes4 coverCurrency, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT( getModule("ARNFT") ).getToken(_nftId);
         
         _checkNftValid(validUntil, scAddress, coverCurrency, coverStatus);
         
@@ -223,6 +223,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     {
         address user = nftOwners[_nftId];
         _removeNft(_nftId);
+        delete nftOwners[_nftId];
         emit ExpiredNFT(user, _nftId, block.timestamp);
     }
 
@@ -235,7 +236,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, /*uint256 validuntil*/, address scAddress, 
          /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
         address user = nftOwners[_nftId];
-        require(user != address(0), "NFT does not belong here.");
+        require(user != address(0), "NFT does not belong to this contract.");
 
         ExpireTracker.pop(uint96(_nftId));
 
@@ -245,9 +246,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         
         // Exit from utilization farming.
         if (ufOn) IUtilizationFarm(getModule("UFS")).withdraw(user, secondPrice);
-
-        // Returns the caller some gas as well as ensure this function cannot be called again.
-        delete nftOwners[_nftId];
 
         emit RemovedNFT(user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
     }

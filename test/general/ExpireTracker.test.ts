@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { getTimestamp, increase } from "../utils";
-let step = BigNumber.from("86400");
+let step = BigNumber.from("259200");
 function getBucket(expire: BigNumber) : BigNumber {
   return (expire.div(step)).mul(step);
 }

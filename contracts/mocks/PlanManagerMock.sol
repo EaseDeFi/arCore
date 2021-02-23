@@ -26,4 +26,7 @@ contract PlanManagerMock {
   function checkCoverage(address _user, address _sc, uint256 _time, uint256 _amount) external view returns(uint256 index, bool check){
     return (0, coverage);
   }
+  function totalUsedCover(address _scAddress) external view returns (uint256) {
+    return 0;
+  }
 }

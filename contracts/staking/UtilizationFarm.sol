@@ -122,7 +122,7 @@ contract UtilizationFarm is ArmorModule, BalanceWrapper, IRewardDistributionReci
         emit BalanceAdded(user, amount);
     }
 
-    function withdraw(address user, uint256 amount) public onlyModules("BALANCE","STAKE") updateReward(user) {
+    function withdraw(address user, uint256 amount) external onlyModules("BALANCE","STAKE") updateReward(user) {
         _removeStake(user, amount);
         emit BalanceWithdrawn(user, amount);
     }

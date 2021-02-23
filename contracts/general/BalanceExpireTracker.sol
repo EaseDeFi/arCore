@@ -16,7 +16,7 @@ contract BalanceExpireTracker {
     // Don't want to keep typing address(0). Typecasting just for clarity.
     uint160 private constant EMPTY = uint160(address(0));
     
-    // 1 week for each step.
+    // 3 days for each step.
     uint64 public constant BUCKET_STEP = 3 days;
 
     // indicates where to start from 
