@@ -67,9 +67,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     modifier update(address _user)
     {
         _updateBalance(_user);
-        
         _;
-        
         Balance memory balance = balances[_user];
         
         if (balance.perSecondPrice > 0) {
@@ -89,10 +87,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
-                BalanceExpireTracker.pop(head);
                 _updateBalance(oldHead);
-        
-                // Remove borrowed amount from PlanManager.        
+                // Remove borrowed amounts from PlanManager.        
                 _notifyBalanceChange(oldHead);
             } else return;
             
@@ -133,8 +129,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         require(msg.value > 0, "No Ether was deposited.");
 
         balances[msg.sender].lastBalance = uint128(balances[msg.sender].lastBalance.add(msg.value));
-        // it is handled in update() function
-        //balances[msg.sender].lastTime = uint64(block.timestamp);
         _notifyBalanceChange(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
@@ -158,6 +152,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         } else {
             _amount = balance.lastBalance;
             balance.lastBalance = 0;
+            BalanceExpireTracker.pop( uint160(msg.sender) );
         }
         
         balances[msg.sender] = balance;
@@ -230,10 +225,12 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     function _priceChange(address _user, uint64 _newPrice) internal {
         Balance storage balance = balances[_user];
         uint64 originalPrice = balance.perSecondPrice;
+        
         if(originalPrice == _newPrice) {
             // no need to process
             return;
         }
+
         if(ufOn && !arShields[_user]) {
             if(originalPrice > _newPrice) {
                 // price is decreasing
@@ -247,15 +244,15 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         balance.perSecondPrice = _newPrice;
         if(_newPrice == 0) {
             BalanceExpireTracker.pop(uint160(_user));
-        }
-        else {
+        } else {
             BalanceExpireTracker.push(uint160(_user), uint64(balance.lastBalance.div(_newPrice)));
         }
+        
         emit PriceChange(_user, _newPrice);
     }
 
     /**
-     * @dev Armor controller has the ability to change the price that a user is paying for their insurance.
+     * @dev PlanManager has the ability to change the price that a user is paying for their insurance.
      * @param _user The user whose price we are changing.
      * @param _newPrice the new price per second that the user will be paying.
      **/
@@ -386,5 +383,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         arShields[_shield] = !arShields[_shield];
     }
+    
 }
 

@@ -99,6 +99,8 @@ contract PlanManager is ArmorModule, IPlanManager {
       override
     {
         require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
+        require(_protocols.length <= 30, "You may not protect more than 30 protocols at once.");
+        
         // Need to get price of the protocol here
         if(plans[msg.sender].length > 0){
           Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
@@ -167,7 +169,7 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @dev Update the contract-wide totals for each protocol that has changed.
      * @param _user User whose plan is updating these totals.
     **/
-    function _removeLatestTotals(address _user) internal{
+    function _removeLatestTotals(address _user) internal {
         Plan storage plan = plans[_user][plans[_user].length - 1];
 
         uint256 idx = plans[_user].length - 1;
@@ -341,7 +343,10 @@ contract PlanManager is ArmorModule, IPlanManager {
         
         if (plan.endTime > block.timestamp) {
             plan.endTime = uint64(balance.div(pricePerSec).add(block.timestamp));
+        } else {
+            _removeLatestTotals(_user);
         }
+
     }
     
     /**

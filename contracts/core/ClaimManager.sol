@@ -72,6 +72,8 @@ contract ClaimManager is ArmorModule, IClaimManager {
     function submitNft(uint256 _nftId,uint256 _hackTime)
       external
       doKeep
+      // proof-of-loss requires this happen AFTER PoL is submitted so we can't risk users submitting before.
+      onlyOwner
     {
         (/*cid*/, uint8 status, uint256 sumAssured, uint16 coverPeriod, uint256 validUntil, address scAddress,
         bytes4 currencyCode, /*premiumNXM*/, /*coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);

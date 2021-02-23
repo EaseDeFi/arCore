@@ -77,10 +77,8 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     function keep() external {
         // Restrict each keep to 2 removals max.
         for (uint256 i = 0; i < 2; i++) {
-            
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
             else return;
-            
         }
     }
     
@@ -125,17 +123,30 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         
         // TODO: Add check if it takes balance below used.
         if (withdrawalTime == 0) {
+            (/*coverId*/,  uint8 coverStatus, uint256 sumAssured, /*uint16 coverPeriod*/, /*uint256 validUntil*/, address scAddress, 
+            /*bytes4 coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+            uint256 totalUsedCover = IPlanManager( getModule("PLAN") ).totalUsedCover(scAddress);
+            bool withdrawable = totalUsedCover <= totalStakedAmount[scAddress].sub(sumAssured * 1e18);
+            require(coverStatus == 0 && withdrawable, "May not withdraw NFT if it will bring staked amount below borrowed amount.");
+            
             withdrawalTime = block.timestamp + withdrawalDelay;
             pendingWithdrawals[_nftId] = withdrawalTime;
+            _removeNft(_nftId);
+            
             emit WithdrawRequest(msg.sender, _nftId, block.timestamp, withdrawalTime);
             return;
         } else if (withdrawalTime > block.timestamp) {
             return;
+        } else {
+            (/*coverId*/,  uint8 coverStatus, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, /*uint256 validUntil*/, /*address scAddress*/, 
+            /*bytes4 coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+            require(coverStatus == 0, "May not withdraw while claim is occurring.");
+            
+            _removeNft(_nftId);
+            IClaimManager(getModule("CLAIM")).transferNft(msg.sender, _nftId);
+            delete pendingWithdrawals[_nftId];
         }
         
-        _removeNft(_nftId);
-        IClaimManager(getModule("CLAIM")).transferNft(msg.sender, _nftId);
-        delete pendingWithdrawals[_nftId];
     }
 
     /**
