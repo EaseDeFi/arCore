@@ -31,7 +31,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // Mapping to doKeep track of how much coverage we've sold for each protocol.
     // smart contract address => total borrowed cover
-    mapping (address => uint256) public totalUsedCover;
+    mapping (address => uint256) public override totalUsedCover;
     
     // Protocol => amount of coverage bought by shields (then shields plus) for that protocol.
     // Keep track of these to only allow a % of staked NFTs to be bought by each.
