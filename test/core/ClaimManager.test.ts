@@ -118,10 +118,10 @@ describe("ClaimManager", function () {
     });
 
     it('should fail if hack is not confirmed yet', async function(){
-      await expect(claimManager.connect(user).submitNft(1, now.sub(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
+      await expect(claimManager.connect(owner).submitNft(1, now.sub(2).toString())).to.be.revertedWith("No hack with these parameters has been confirmed");
     });
     it('should success', async function(){
-      await claimManager.connect(user).submitNft(1, now.sub(1).toString());
+      await claimManager.connect(owner).submitNft(1, now.sub(1).toString());
     });
   });
 

@@ -76,7 +76,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function keep() external {
         // Restrict each keep to 2 removals max.
-        for (uint256 i = 0; i < 2; i++) {
+        for (uint256 i = 0; i < 3; i++) {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
             else return;
         }
@@ -116,13 +116,12 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       external
       doKeep
     {
-        require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
-        
         // Check when this NFT is allowed to be withdrawn. If 0, set it.
         uint256 withdrawalTime = pendingWithdrawals[_nftId];
         
-        // TODO: Add check if it takes balance below used.
         if (withdrawalTime == 0) {
+            require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
+            
             (/*coverId*/,  uint8 coverStatus, uint256 sumAssured, /*uint16 coverPeriod*/, /*uint256 validUntil*/, address scAddress, 
             /*bytes4 coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
             uint256 totalUsedCover = IPlanManager( getModule("PLAN") ).totalUsedCover(scAddress);
