@@ -7,7 +7,7 @@ More information is available at https://armorfi.gitbook.io/armor/products/arcor
 
 ## Bug bounty
 
-Bug bounty information is available at https://immunefi.com/bounty/armorfi/. Top reward is 1 million ARMOR for a critical vulnerability that will lead to the loss of over $1 million in user funds. SushiLPFarm.sol and SushiFarmController.sol are not eligible for bug bounty quite yet.
+<b>Fixes are currently being made on BalanceManager and PlanManager so there are likely to be known bugs there.</b> Bug bounty information is available at https://immunefi.com/bounty/armorfi/. Top reward is 1 million ARMOR for a critical vulnerability that will lead to the loss of over $1 million in user funds. SushiLPFarm.sol and SushiFarmController.sol are not eligible for bug bounty quite yet.
 
 ## ArmorMaster
 
