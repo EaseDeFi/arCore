@@ -340,8 +340,9 @@ contract PlanManager is ArmorModule, IPlanManager {
         Plan storage plan = plans[_user][plans[_user].length-1];
         uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(_user);
         uint256 pricePerSec = IBalanceManager(getModule("BALANCE")).perSecondPrice(_user);
-        
-        if (plan.endTime > block.timestamp) {
+        if(pricePerSec == 0 ){
+            plan.endTime = uint64(~0);
+        } else if (plan.endTime > block.timestamp) {
             plan.endTime = uint64(balance.div(pricePerSec).add(block.timestamp));
         } else {
             _removeLatestTotals(_user);

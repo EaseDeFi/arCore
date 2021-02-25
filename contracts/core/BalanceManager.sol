@@ -10,7 +10,7 @@ import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IUtilizationFarm.sol';
-
+import 'hardhat/console.sol';
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -18,7 +18,7 @@ import '../interfaces/IUtilizationFarm.sol';
 contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
 
     using SafeMath for uint256;
-    using SafeMath for uint128;
+    using SafeMath128 for uint128;
 
     // Wallet of the developers for if a developer fee is being paid.
     address public devWallet;
@@ -73,6 +73,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         if (balance.perSecondPrice > 0) {
             uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
             BalanceExpireTracker.push(uint160(_user), expiry);
+        } else {
+            BalanceExpireTracker.pop(uint160(_user));
         }
         
     }
@@ -88,8 +90,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
                 _updateBalance(oldHead);
-                // Remove borrowed amounts from PlanManager.        
-                _notifyBalanceChange(oldHead);
             } else return;
             
         }
@@ -128,8 +128,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         
         require(msg.value > 0, "No Ether was deposited.");
 
-        balances[msg.sender].lastBalance = uint128(balances[msg.sender].lastBalance.add(msg.value));
-        _notifyBalanceChange(msg.sender);
+        balances[msg.sender].lastBalance = balances[msg.sender].lastBalance.add(uint128(msg.value));
+        _notifyExpiryChange(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -148,15 +148,16 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
 
         // Since cost increases per second, it's difficult to estimate the correct amount. Withdraw it all in that case.
         if (balance.lastBalance > _amount) {
-            balance.lastBalance = uint128( balance.lastBalance.sub(_amount) );
+            balance.lastBalance = balance.lastBalance.sub(uint128(_amount));
         } else {
             _amount = balance.lastBalance;
             balance.lastBalance = 0;
-            BalanceExpireTracker.pop( uint160(msg.sender) );
+            _priceChange(msg.sender, 0);
+            BalanceExpireTracker.pop(uint160(msg.sender));
         }
         
         balances[msg.sender] = balance;
-        _notifyBalanceChange(msg.sender);
+        _notifyExpiryChange(msg.sender);
         msg.sender.transfer(_amount);
         emit Withdraw(msg.sender, _amount);
     }
@@ -174,10 +175,10 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         Balance memory balance = balances[_user];
 
         // We adjust balance on chain based on how many blocks have passed.
-        uint256 lastBalance = balance.lastBalance;
+        uint128 lastBalance = balance.lastBalance;
 
-        uint256 timeElapsed = block.timestamp.sub(balance.lastTime);
-        uint256 cost = timeElapsed.mul(balance.perSecondPrice);
+        uint128 timeElapsed = uint128(block.timestamp.sub(balance.lastTime));
+        uint128 cost = timeElapsed.mul(uint128(balance.perSecondPrice));
 
         // If the elapsed time has brought balance to 0, make it 0.
         uint256 newBalance;
@@ -197,20 +198,25 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         Balance memory balance = balances[_user];
 
         // The new balance that a user will have.
-        uint256 newBalance = balanceOf(_user);
-
+        uint128 newBalance = uint128(balanceOf(_user));
         // newBalance should never be greater than last balance.
         uint256 loss = balance.lastBalance.sub(newBalance);
+        if(loss == 0){
+            return;
+        }
     
         _payPercents(_user, uint128(loss));
 
         // Update storage balance.
-        balance.lastBalance = uint128(newBalance);
+        balance.lastBalance = newBalance;
         balance.lastTime = uint64(block.timestamp);
         emit Loss(_user, loss);
         
         if (newBalance == 0) {
+            console.log("ZERO");
             _priceChange(_user, 0);
+            _notifyExpiryChange(_user);
+            BalanceExpireTracker.pop(uint160(_user));
         }
         
         balances[_user] = balance;
@@ -234,19 +240,18 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         if(ufOn && !arShields[_user]) {
             if(originalPrice > _newPrice) {
                 // price is decreasing
+                console.log("DECREASING");
+                console.logUint(originalPrice.sub(_newPrice));
                 IUtilizationFarm(getModule("UFB")).withdraw(_user, originalPrice.sub(_newPrice));
             } else {
                 // price is increasing
+                console.log("INCREASING");
+                console.logUint(_newPrice.sub(originalPrice));
                 IUtilizationFarm(getModule("UFB")).stake(_user, _newPrice.sub(originalPrice));
             } 
         }
         
         balance.perSecondPrice = _newPrice;
-        if(_newPrice == 0) {
-            BalanceExpireTracker.pop(uint160(_user));
-        } else {
-            BalanceExpireTracker.push(uint160(_user), uint64(balance.lastBalance.div(_newPrice)));
-        }
         
         emit PriceChange(_user, _newPrice);
     }
@@ -262,6 +267,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       onlyModule("PLAN")
       update(_user)
     {
+        console.log("CHANGEPRICE");
         _priceChange(_user, _newPrice);
     }
 
@@ -308,21 +314,21 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         uint128 refAmount = referrers[_user] != address(0) ? _charged * refPercent / DENOMINATOR : 0;
         uint128 devAmount = _charged * devPercent / DENOMINATOR;
         uint128 govAmount = _charged * govPercent / DENOMINATOR;
-        uint128 nftAmount = uint128( _charged.sub(refAmount).sub(devAmount).sub(govAmount) );
+        uint128 nftAmount = _charged.sub(refAmount).sub(devAmount).sub(govAmount);
         
         if (refAmount > 0) {
-            balances[ referrers[_user] ].lastBalance = uint128( balances[ referrers[_user] ].lastBalance.add(refAmount) );
+            balances[ referrers[_user] ].lastBalance = balances[ referrers[_user] ].lastBalance.add(refAmount);
             emit AffiliatePaid(referrers[_user], _user, refAmount, block.timestamp);
         }
-        if (devAmount > 0) balances[devWallet].lastBalance = uint128( balances[devWallet].lastBalance.add(devAmount) );
-        if (govAmount > 0) balances[getModule("GOVSTAKE")].lastBalance = uint128( balances[getModule("GOVSTAKE")].lastBalance.add(govAmount) );
-        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = uint128( balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount) );
+        if (devAmount > 0) balances[devWallet].lastBalance = balances[devWallet].lastBalance.add(devAmount);
+        if (govAmount > 0) balances[getModule("GOVSTAKE")].lastBalance = balances[getModule("GOVSTAKE")].lastBalance.add(govAmount);
+        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount);
     }
 
     /**
      * @dev Balance has changed so PlanManager's expire time must be either increased or reduced.
     **/
-    function _notifyBalanceChange(address _user) 
+    function _notifyExpiryChange(address _user) 
       internal
     {
         IPlanManager(getModule("PLAN")).updateExpireTime(_user); 

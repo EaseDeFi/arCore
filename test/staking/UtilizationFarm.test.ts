@@ -154,7 +154,7 @@ describe("UtilizationFarm", function () {
       expect(stake.toString()).to.equal("1000000000000")
     });
 
-    it("should remove correctly on withdrawal/expiry", async function (){
+    it.only("should remove correctly on withdrawal/expiry", async function (){
       await increase(10000);
       await balanceManager.connect(user).withdraw(amount);
 

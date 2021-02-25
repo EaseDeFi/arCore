@@ -68,3 +68,63 @@ library SafeMath {
     }
 }
 
+library SafeMath128 {
+    /**
+     * @dev Multiplies two unsigned integers, reverts on overflow.
+     */
+    function mul(uint128 a, uint128 b) internal pure returns (uint128) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-solidity/pull/522
+        if (a == 0) {
+            return 0;
+        }
+
+        uint128 c = a * b;
+        require(c / a == b);
+
+        return c;
+    }
+
+    /**
+     * @dev Integer division of two unsigned integers truncating the quotient, reverts on division by zero.
+     */
+    function div(uint128 a, uint128 b) internal pure returns (uint128) {
+        // Solidity only automatically asserts when dividing by 0
+        require(b > 0);
+        uint128 c = a / b;
+        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+
+        return c;
+    }
+
+    /**
+     * @dev Subtracts two unsigned integers, reverts on overflow (i.e. if subtrahend is greater than minuend).
+     */
+    function sub(uint128 a, uint128 b) internal pure returns (uint128) {
+        require(b <= a);
+        uint128 c = a - b;
+
+        return c;
+    }
+
+    /**
+     * @dev Adds two unsigned integers, reverts on overflow.
+     */
+    function add(uint128 a, uint128 b) internal pure returns (uint128) {
+        uint128 c = a + b;
+        require(c >= a);
+
+        return c;
+    }
+
+    /**
+     * @dev Divides two unsigned integers and returns the remainder (unsigned integer modulo),
+     * reverts when dividing by zero.
+     */
+    function mod(uint128 a, uint128 b) internal pure returns (uint128) {
+        require(b != 0);
+        return a % b;
+    }
+}
+
