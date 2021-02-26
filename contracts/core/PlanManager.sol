@@ -330,23 +330,21 @@ contract PlanManager is ArmorModule, IPlanManager {
     /**
      * @dev BalanceManager calls to update expire time of a plan when a deposit/withdrawal happens.
      * @param _user Address whose balance was updated.
+     * @param _expiry New time plans expire.
     **/
-    function updateExpireTime(address _user)
+    function updateExpireTime(address _user, uint256 _expiry)
       external
       override
       onlyModule("BALANCE")
     {
         if (plans[_user].length == 0) return;
         Plan storage plan = plans[_user][plans[_user].length-1];
-        uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(_user);
-        uint256 pricePerSec = IBalanceManager(getModule("BALANCE")).perSecondPrice(_user);
         
         if (plan.endTime > block.timestamp) {
-            plan.endTime = uint64(balance.div(pricePerSec).add(block.timestamp));
+            plan.endTime = uint64(_expiry);
         } else {
             _removeLatestTotals(_user);
         }
-
     }
     
     /**

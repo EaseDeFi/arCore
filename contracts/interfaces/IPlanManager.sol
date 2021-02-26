@@ -11,7 +11,7 @@ interface IPlanManager {
   function checkCoverage(address _user, address _protocol, uint256 _hacktime, uint256 _amount) external view returns (uint256, bool);
   function coverageLeft(address _protocol) external view returns(uint256);
   function getCurrentPlan(address _user) external view returns(uint128 start, uint128 end);
-  function updateExpireTime(address _user) external;
+  function updateExpireTime(address _user, uint256 _expiry) external;
   function planRedeemed(address _user, uint256 _planIndex, address _protocol) external;
   function totalUsedCover(address _scAddress) external view returns (uint256);
 }

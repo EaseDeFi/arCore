@@ -10,7 +10,7 @@ contract PlanManagerMock {
   event UpdateExpireTime(address _user);
   receive() external payable{
   }
-  function updateExpireTime(address _user)  external {
+  function updateExpireTime(address _user, uint256 expiry)  external {
       emit UpdateExpireTime(_user);
   }
   function mockChangePrice(address _balanceManager, address _user, uint64 _newPrice) external {
