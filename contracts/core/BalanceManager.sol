@@ -10,7 +10,7 @@ import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IUtilizationFarm.sol';
-import 'hardhat/console.sol';
+
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -18,7 +18,7 @@ import 'hardhat/console.sol';
 contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
 
     using SafeMath for uint256;
-    using SafeMath128 for uint128;
+    using SafeMath for uint128;
 
     // Wallet of the developers for if a developer fee is being paid.
     address public devWallet;
@@ -66,17 +66,9 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      **/
     modifier update(address _user)
     {
-        _updateBalance(_user);
+        uint256 _oldBal = _updateBalance(_user);
         _;
-        Balance memory balance = balances[_user];
-        
-        if (balance.perSecondPrice > 0) {
-            uint64 expiry = uint64( balance.lastBalance.div(uint128(balance.perSecondPrice)).add(uint128(balance.lastTime)) );
-            BalanceExpireTracker.push(uint160(_user), expiry);
-        } else {
-            BalanceExpireTracker.pop(uint160(_user));
-        }
-        
+        _updateBalanceActions(_user, _oldBal);
     }
 
     /**
@@ -89,7 +81,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
-                _updateBalance(oldHead);
+                uint256 oldBal = _updateBalance(oldHead);
+                _updateBalanceActions(oldHead, oldBal);
             } else return;
             
         }
@@ -113,7 +106,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     /**
      * @dev Borrower deposits an amount of ETH to pay for coverage.
      * @param _referrer User who referred the depositor.
-     **/
+    **/
     function deposit(address _referrer) 
       external
       payable
@@ -128,15 +121,14 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         
         require(msg.value > 0, "No Ether was deposited.");
 
-        balances[msg.sender].lastBalance = balances[msg.sender].lastBalance.add(uint128(msg.value));
-        _notifyExpiryChange(msg.sender);
+        balances[msg.sender].lastBalance = uint128(balances[msg.sender].lastBalance.add(msg.value));
         emit Deposit(msg.sender, msg.value);
     }
 
     /**
      * @dev Borrower withdraws Dai from the contract.
      * @param _amount The amount of Dai to withdraw.
-     **/
+    **/
     function withdraw(uint256 _amount)
       external
       override
@@ -144,20 +136,18 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       doKeep
       update(msg.sender)
     {
+        require(_amount > 0, "Must withdraw more than 0.");
         Balance memory balance = balances[msg.sender];
 
         // Since cost increases per second, it's difficult to estimate the correct amount. Withdraw it all in that case.
         if (balance.lastBalance > _amount) {
-            balance.lastBalance = balance.lastBalance.sub(uint128(_amount));
+            balance.lastBalance = uint128( balance.lastBalance.sub(_amount) );
         } else {
             _amount = balance.lastBalance;
             balance.lastBalance = 0;
-            _priceChange(msg.sender, 0);
-            BalanceExpireTracker.pop(uint160(msg.sender));
         }
         
         balances[msg.sender] = balance;
-        _notifyExpiryChange(msg.sender);
         msg.sender.transfer(_amount);
         emit Withdraw(msg.sender, _amount);
     }
@@ -175,10 +165,10 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         Balance memory balance = balances[_user];
 
         // We adjust balance on chain based on how many blocks have passed.
-        uint128 lastBalance = balance.lastBalance;
+        uint256 lastBalance = balance.lastBalance;
 
-        uint128 timeElapsed = uint128(block.timestamp.sub(balance.lastTime));
-        uint128 cost = timeElapsed.mul(uint128(balance.perSecondPrice));
+        uint256 timeElapsed = block.timestamp.sub(balance.lastTime);
+        uint256 cost = timeElapsed.mul(balance.perSecondPrice);
 
         // If the elapsed time has brought balance to 0, make it 0.
         uint256 newBalance;
@@ -186,89 +176,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         else newBalance = 0;
 
         return newBalance;
-    }
-
-    /**
-     * @dev Update a borrower's balance to it's adjusted amount.
-     * @param _user The address to be updated.
-     **/
-    function _updateBalance(address _user)
-      internal
-    {
-        Balance memory balance = balances[_user];
-
-        // The new balance that a user will have.
-        uint128 newBalance = uint128(balanceOf(_user));
-        // newBalance should never be greater than last balance.
-        uint256 loss = balance.lastBalance.sub(newBalance);
-        if(loss == 0){
-            return;
-        }
-    
-        _payPercents(_user, uint128(loss));
-
-        // Update storage balance.
-        balance.lastBalance = newBalance;
-        balance.lastTime = uint64(block.timestamp);
-        emit Loss(_user, loss);
-        
-        if (newBalance == 0) {
-            console.log("ZERO");
-            _priceChange(_user, 0);
-            _notifyExpiryChange(_user);
-            BalanceExpireTracker.pop(uint160(_user));
-        }
-        
-        balances[_user] = balance;
-    }
-
-    /**
-     * @dev handle the user's balance change. this will interact with UFB
-     * @param _user user's address
-     * @param _newPrice user's new per sec price
-     **/
-
-    function _priceChange(address _user, uint64 _newPrice) internal {
-        Balance storage balance = balances[_user];
-        uint64 originalPrice = balance.perSecondPrice;
-        
-        if(originalPrice == _newPrice) {
-            // no need to process
-            return;
-        }
-
-        if(ufOn && !arShields[_user]) {
-            if(originalPrice > _newPrice) {
-                // price is decreasing
-                console.log("DECREASING");
-                console.logUint(originalPrice.sub(_newPrice));
-                IUtilizationFarm(getModule("UFB")).withdraw(_user, originalPrice.sub(_newPrice));
-            } else {
-                // price is increasing
-                console.log("INCREASING");
-                console.logUint(_newPrice.sub(originalPrice));
-                IUtilizationFarm(getModule("UFB")).stake(_user, _newPrice.sub(originalPrice));
-            } 
-        }
-        
-        balance.perSecondPrice = _newPrice;
-        
-        emit PriceChange(_user, _newPrice);
-    }
-
-    /**
-     * @dev PlanManager has the ability to change the price that a user is paying for their insurance.
-     * @param _user The user whose price we are changing.
-     * @param _newPrice the new price per second that the user will be paying.
-     **/
-    function changePrice(address _user, uint64 _newPrice)
-      external
-      override
-      onlyModule("PLAN")
-      update(_user)
-    {
-        console.log("CHANGEPRICE");
-        _priceChange(_user, _newPrice);
     }
 
     /**
@@ -303,6 +210,106 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     }
     
     /**
+     * @dev Update a borrower's balance to it's adjusted amount.
+     * @param _user The address to be updated.
+     **/
+    function _updateBalance(address _user)
+      internal
+      returns (uint256 oldBalance)
+    {
+        Balance memory balance = balances[_user];
+
+        oldBalance = balance.lastBalance;
+        uint256 newBalance = balanceOf(_user);
+
+        // newBalance should never be greater than last balance.
+        uint256 loss = oldBalance.sub(newBalance);
+    
+        _payPercents(_user, uint128(loss));
+
+        // Update storage balance.
+        balance.lastBalance = uint128(newBalance);
+        balance.lastTime = uint64(block.timestamp);
+        emit Loss(_user, loss);
+        
+        balances[_user] = balance;
+    }
+
+    /**
+     * @dev Actions relating to balance updates.
+     * @param _user The user who we're updating.
+     * @param _oldBal The original balance in the tx.
+    **/
+    function _updateBalanceActions(address _user, uint256 _oldBal)
+      internal
+    {
+        Balance memory balance = balances[_user];
+        if (_oldBal != balance.lastBalance && balance.perSecondPrice > 0) {
+            _notifyBalanceChange(_user, balance.lastBalance, balance.perSecondPrice);
+            _adjustExpiry(_user, balance.lastBalance.div(balance.perSecondPrice).add(block.timestamp));
+        }
+        if (balance.lastBalance == 0 && _oldBal != 0) {
+            _priceChange(_user, 0);
+        }
+    }
+    
+    /**
+     * @dev handle the user's balance change. this will interact with UFB
+     * @param _user user's address
+     * @param _newPrice user's new per sec price
+     **/
+
+    function _priceChange(address _user, uint64 _newPrice) 
+      internal 
+    {
+        Balance memory balance = balances[_user];
+        uint64 originalPrice = balance.perSecondPrice;
+        
+        if(originalPrice == _newPrice) {
+            // no need to process
+            return;
+        }
+
+        if (ufOn && !arShields[_user]) {
+            if(originalPrice > _newPrice) {
+                // price is decreasing
+                IUtilizationFarm(getModule("UFB")).withdraw(_user, originalPrice.sub(_newPrice));
+            } else {
+                // price is increasing
+                IUtilizationFarm(getModule("UFB")).stake(_user, _newPrice.sub(originalPrice));
+            } 
+        }
+        
+        balances[_user].perSecondPrice = _newPrice;
+        emit PriceChange(_user, _newPrice);
+    }
+    
+    /**
+     * @dev Adjust when a balance expires.
+     * @param _user Address of the user whose expiry we're adjusting.
+     * @param _newExpiry New Unix timestamp of expiry.
+    **/
+    function _adjustExpiry(address _user, uint256 _newExpiry)
+      internal
+    {
+        if (_newExpiry == 0) {
+            BalanceExpireTracker.pop(uint160(_user));
+        } else {
+            BalanceExpireTracker.push(uint160(_user), uint64(_newExpiry));
+        }
+    }
+    
+    /**
+     * @dev Balance has changed so PlanManager's expire time must be either increased or reduced.
+    **/
+    function _notifyBalanceChange(address _user, uint256 _newBalance, uint256 _newPerSec) 
+      internal
+    {
+        uint256 expiry = _newBalance.div(_newPerSec).add(block.timestamp);
+        IPlanManager(getModule("PLAN")).updateExpireTime(_user, expiry); 
+    }
+    
+    /**
      * @dev Give rewards to different places.
      * @param _user User that's being charged.
      * @param _charged Amount of funds charged to the user.
@@ -314,24 +321,31 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         uint128 refAmount = referrers[_user] != address(0) ? _charged * refPercent / DENOMINATOR : 0;
         uint128 devAmount = _charged * devPercent / DENOMINATOR;
         uint128 govAmount = _charged * govPercent / DENOMINATOR;
-        uint128 nftAmount = _charged.sub(refAmount).sub(devAmount).sub(govAmount);
+        uint128 nftAmount = uint128( _charged.sub(refAmount).sub(devAmount).sub(govAmount) );
         
         if (refAmount > 0) {
-            balances[ referrers[_user] ].lastBalance = balances[ referrers[_user] ].lastBalance.add(refAmount);
+            balances[ referrers[_user] ].lastBalance = uint128( balances[ referrers[_user] ].lastBalance.add(refAmount) );
             emit AffiliatePaid(referrers[_user], _user, refAmount, block.timestamp);
         }
-        if (devAmount > 0) balances[devWallet].lastBalance = balances[devWallet].lastBalance.add(devAmount);
-        if (govAmount > 0) balances[getModule("GOVSTAKE")].lastBalance = balances[getModule("GOVSTAKE")].lastBalance.add(govAmount);
-        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount);
+        if (devAmount > 0) balances[devWallet].lastBalance = uint128( balances[devWallet].lastBalance.add(devAmount) );
+        if (govAmount > 0) balances[getModule("GOVSTAKE")].lastBalance = uint128( balances[getModule("GOVSTAKE")].lastBalance.add(govAmount) );
+        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = uint128( balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount) );
     }
-
+    
     /**
-     * @dev Balance has changed so PlanManager's expire time must be either increased or reduced.
-    **/
-    function _notifyExpiryChange(address _user) 
-      internal
+     * @dev PlanManager has the ability to change the price that a user is paying for their insurance.
+     * @param _user The user whose price we are changing.
+     * @param _newPrice the new price per second that the user will be paying.
+     **/
+    function changePrice(address _user, uint64 _newPrice)
+      external
+      override
+      onlyModule("PLAN")
     {
-        IPlanManager(getModule("PLAN")).updateExpireTime(_user); 
+        uint256 newBal = _updateBalance(_user);
+        _priceChange(_user, _newPrice);
+        if (_newPrice > 0) _adjustExpiry(_user, newBal.div(_newPrice).add(block.timestamp));
+        else _adjustExpiry(_user, 0);
     }
     
     /**
