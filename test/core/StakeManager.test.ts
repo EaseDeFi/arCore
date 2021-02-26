@@ -99,7 +99,7 @@ describe("StakeManager", function () {
     });
     it("should fail if nft is expired or 1 day before expiration", async function() {
       await increase(86400 * 100);
-      await expect(stakeManager.connect(user).stakeNft(1)).to.be.revertedWith("NFT is expired or within 1 day of expiry.");
+      await expect(stakeManager.connect(user).stakeNft(1)).to.be.revertedWith("NFT is expired or within 20 days of expiry.");
     });
     it("should fail if nft submitted to claim", async function() {
       await arNFT.connect(user).submitClaim(1);
@@ -143,7 +143,7 @@ describe("StakeManager", function () {
         arNFT.address,
         "0x45544800",
         [100, 10000000000000, 1000, 10000000, 1],
-        10,
+        100,
         0,
         ethers.utils.randomBytes(32),
         ethers.utils.randomBytes(32)
@@ -152,7 +152,7 @@ describe("StakeManager", function () {
         arNFT.address,
         "0x45544800",
         [100, 10000000000000, 1000, 10000000, 1],
-        10,
+        100,
         0,
         ethers.utils.randomBytes(32),
         ethers.utils.randomBytes(32)

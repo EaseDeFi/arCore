@@ -91,7 +91,7 @@ describe("UtilizationFarm", function () {
         arNFT.address,
         "0x45544800",
         [100, 10000000000000, 1000, 10000000, 1],
-        10,
+        100,
         0,
         ethers.utils.randomBytes(32),
         ethers.utils.randomBytes(32)
@@ -100,7 +100,7 @@ describe("UtilizationFarm", function () {
         arNFT.address,
         "0x45544800",
         [100, 10000000000000, 1000, 10000000, 1],
-        10,
+        100,
         0,
         ethers.utils.randomBytes(32),
         ethers.utils.randomBytes(32)
@@ -112,12 +112,12 @@ describe("UtilizationFarm", function () {
     it("should add correctly on stake", async function() {
       await stakeManager.connect(user).stakeNft(1);
       let stake = await utilizationFarm.balanceOf(user.getAddress());
-      expect(stake.toString()).to.equal("11574074");
+      expect(stake.toString()).to.equal("1157407");
     });
     
     it("should remove correctly on stake expiry", async function() {
       await stakeManager.connect(user).stakeNft(1);
-      await increase(10 * 86400)
+      await increase(100 * 86400)
 
       await stakeManager.connect(user).keep();
 
@@ -185,7 +185,7 @@ describe("UtilizationFarm", function () {
         arNFT.address,
         "0x45544800",
         [100, 10000000000000, 1000, 10000000, 1],
-        10,
+        100,
         0,
         ethers.utils.randomBytes(32),
         ethers.utils.randomBytes(32)
@@ -194,7 +194,7 @@ describe("UtilizationFarm", function () {
         arNFT.address,
         "0x45544800",
         [100, 10000000000000, 1000, 10000000, 1],
-        10,
+        100,
         0,
         ethers.utils.randomBytes(32),
         ethers.utils.randomBytes(32)

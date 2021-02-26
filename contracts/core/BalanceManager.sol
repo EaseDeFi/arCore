@@ -126,8 +126,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     }
 
     /**
-     * @dev Borrower withdraws Dai from the contract.
-     * @param _amount The amount of Dai to withdraw.
+     * @dev Borrower withdraws ETH from their balance.
+     * @param _amount The amount of ETH to withdraw.
     **/
     function withdraw(uint256 _amount)
       external
@@ -207,6 +207,22 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         Balance memory balance = balances[_user];
         return balance.perSecondPrice;
+    }
+    
+    /**
+     * @dev PlanManager has the ability to change the price that a user is paying for their insurance.
+     * @param _user The user whose price we are changing.
+     * @param _newPrice the new price per second that the user will be paying.
+     **/
+    function changePrice(address _user, uint64 _newPrice)
+      external
+      override
+      onlyModule("PLAN")
+    {
+        _updateBalance(_user);
+        _priceChange(_user, _newPrice);
+        if (_newPrice > 0) _adjustExpiry(_user, balances[_user].lastBalance.div(_newPrice).add(block.timestamp));
+        else _adjustExpiry(_user, block.timestamp);
     }
     
     /**
@@ -292,7 +308,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     function _adjustExpiry(address _user, uint256 _newExpiry)
       internal
     {
-        if (_newExpiry == 0) {
+        if (_newExpiry == block.timestamp) {
             BalanceExpireTracker.pop(uint160(_user));
         } else {
             BalanceExpireTracker.push(uint160(_user), uint64(_newExpiry));
@@ -329,23 +345,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
         if (devAmount > 0) balances[devWallet].lastBalance = uint128( balances[devWallet].lastBalance.add(devAmount) );
         if (govAmount > 0) balances[getModule("GOVSTAKE")].lastBalance = uint128( balances[getModule("GOVSTAKE")].lastBalance.add(govAmount) );
-        if (nftAmount > 0) balances[address(IRewardManager(getModule("REWARD")))].lastBalance = uint128( balances[address(IRewardManager(getModule("REWARD")))].lastBalance.add(nftAmount) );
-    }
-    
-    /**
-     * @dev PlanManager has the ability to change the price that a user is paying for their insurance.
-     * @param _user The user whose price we are changing.
-     * @param _newPrice the new price per second that the user will be paying.
-     **/
-    function changePrice(address _user, uint64 _newPrice)
-      external
-      override
-      onlyModule("PLAN")
-    {
-        uint256 newBal = _updateBalance(_user);
-        _priceChange(_user, _newPrice);
-        if (_newPrice > 0) _adjustExpiry(_user, newBal.div(_newPrice).add(block.timestamp));
-        else _adjustExpiry(_user, 0);
+        if (nftAmount > 0) balances[getModule("REWARD")].lastBalance = uint128( balances[getModule("REWARD")].lastBalance.add(nftAmount) );
     }
     
     /**

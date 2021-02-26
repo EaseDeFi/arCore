@@ -152,7 +152,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         
         //add protocol plan
         for(uint256 i = 0;i<_protocols.length; i++){
-            bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",msg.sender,plans[msg.sender].length - 1,i));
+            bytes32 key = _hashKey(msg.sender, plans[msg.sender].length - 1, i);
             uint64 protocolId = IStakeManager(getModule("STAKE")).protocolId(_protocols[i]);
             protocolPlan[key] = ProtocolPlan(protocolId, uint192(_coverAmounts[i]));
         }
@@ -175,7 +175,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         uint256 idx = plans[_user].length - 1;
 
         for (uint256 i = 0; i < plan.length; i++) {
-            bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,idx,i));
+            bytes32 key = _hashKey(_user, idx, i);
             ProtocolPlan memory protocol = protocolPlan[key];
             address protocolAddress = IStakeManager(getModule("STAKE")).protocolAddress(protocol.protocolId);
             totalUsedCover[protocolAddress] = totalUsedCover[protocolAddress].sub(uint256(protocol.amount));
@@ -279,7 +279,7 @@ contract PlanManager is ArmorModule, IPlanManager {
             // Only one plan will be active at the time of a hack--return cover amount from then.
             if (_hackTime >= plan.startTime && _hackTime < plan.endTime) {
                 for(uint256 j = 0; j< plan.length; j++){
-                    bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,i,j));
+                    bytes32 key = _hashKey(_user, uint256(i), j);
                     if(IStakeManager(getModule("STAKE")).protocolAddress(protocolPlan[key].protocolId) == _protocol){
                         return (uint256(i), _amount <= uint256(protocolPlan[key].amount));
                     }
@@ -305,7 +305,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         require(plan.endTime <= now, "Cannot redeem active plan, update plan to redeem properly");
 
         for (uint256 i = 0; i < plan.length; i++) {
-            bytes32 key = keccak256(abi.encodePacked("ARMORFI.PLAN.",_user,_planIndex,i));
+            bytes32 key = _hashKey(_user,_planIndex,i);
             
             ProtocolPlan memory protocol = protocolPlan[key];
             address protocolAddress = IStakeManager(getModule("STAKE")).protocolAddress(protocol.protocolId);
@@ -317,7 +317,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     /**
      * @dev Armor has the ability to change the price that a user is paying for their insurance.
      * @param _protocol The protocol whose arNFT price is being updated.
-     * @param _newPrice the new price PER BLOCK that the user will be paying.
+     * @param _newPrice the new price PER SECOND that the user will be paying.
     **/
     function changePrice(address _protocol, uint256 _newPrice)
       external
@@ -345,6 +345,21 @@ contract PlanManager is ArmorModule, IPlanManager {
         } else {
             _removeLatestTotals(_user);
         }
+    }
+    
+    /**
+     * @dev Hash for protocol info identifier.
+     * @param _user Address of the user.
+     * @param _planIndex Index of the plan in the user's plan array.
+     * @param _protoIndex Index of the protocol in the plan.
+     * @return Hash for identifier for protocolPlan mapping.
+    **/
+    function _hashKey(address _user, uint256 _planIndex, uint256 _protoIndex)
+      internal
+      pure
+    returns (bytes32)
+    {
+        return keccak256(abi.encodePacked("ARMORFI.PLAN.", _user, _planIndex, _protoIndex));
     }
     
     /**

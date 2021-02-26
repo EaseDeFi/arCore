@@ -133,7 +133,7 @@ describe("PlanManager", function () {
 
   describe('#updateExpireTime()', function(){
     it('should fail if msg.sender is not balance manager', async function(){
-      await expect(planManager.connect(user).updateExpireTime(await user.getAddress())).to.be.revertedWith("only module BALANCE can call this function");
+      await expect(planManager.connect(user).updateExpireTime(await user.getAddress(), 1700000000)).to.be.revertedWith("only module BALANCE can call this function");
     });
 
     it('should do nothing if user does not have any plan', async function(){
