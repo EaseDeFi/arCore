@@ -137,7 +137,7 @@ describe("PlanManager", function () {
     });
 
     it('should do nothing if user does not have any plan', async function(){
-      await balanceManager.updateExpireTime(planManager.address, await user.getAddress());
+      await balanceManager.updateExpireTime(planManager.address, await user.getAddress(), 0);
     });
     
     it('should do nothing if plan is already expired', async function(){
@@ -148,7 +148,7 @@ describe("PlanManager", function () {
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       await increase(plan.end.add(1000).toNumber());
-      await balanceManager.updateExpireTime(planManager.address, await user.getAddress());
+      await balanceManager.updateExpireTime(planManager.address, await user.getAddress(), 0);
     });
     
     it('should update expiretime when there is active plan', async function(){
@@ -157,8 +157,20 @@ describe("PlanManager", function () {
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
-      await balanceManager.updateExpireTime(planManager.address, await user.getAddress());
+      await balanceManager.updateExpireTime(planManager.address, await user.getAddress(), 0);
     });
+
+    it('should correctly remove latest totals if needed', async function(){
+      await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
+      await balanceManager.setBalance(await user.getAddress(), userBalance);
+      await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
+      await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
+      await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
+      await balanceManager.updateExpireTime(planManager.address, await user.getAddress(), 0);
+      let updated = await planManager.totalUsedCover(balanceManager.address);
+      expect(updated.toString()).to.be.equal('0')
+    });
+
   });
 
   describe('#planRedeemed()', function(){

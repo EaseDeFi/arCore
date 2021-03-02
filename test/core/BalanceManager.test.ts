@@ -171,6 +171,15 @@ describe("BalanceManager", function () {
       info = await balanceManager.infos(referrer.getAddress());
       expect(info[2].toString()).to.not.equal("0")
     });
+
+    it("should delete balance price on expiry", async function (){
+      await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
+      await planManager.mockChangePrice(balanceManager.address, await user.getAddress(),amount.div(1000));
+      await increase(86400);
+      await balanceManager.connect(owner).deposit(await referrer.getAddress(), {value:amount});
+      let balance = await balanceManager.balances(user.getAddress())
+      expect(balance[1].toString()).to.be.equal('0');
+    });
   });
 
   describe("#operation functions", function() {

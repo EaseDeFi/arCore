@@ -37,11 +37,11 @@ describe("StakeManager", function () {
     await stakeManager.connect(owner).initialize(master.address);
     await master.connect(owner).registerModule(stringToBytes32("STAKE"), stakeManager.address);
     
-    const BalanceFactory = await ethers.getContractFactory("BalanceManager");
+    const BalanceFactory = await ethers.getContractFactory("BalanceManagerMock");
     balanceManager = await BalanceFactory.deploy();
-    await balanceManager.connect(owner).initialize(master.address, dev.getAddress());
-    await master.connect(owner).registerModule(stringToBytes32("BALANCE"), stakeManager.address);
-    await balanceManager.toggleUF();
+    //await balanceManager.connect(owner).initialize(master.address, dev.getAddress());
+    await master.connect(owner).registerModule(stringToBytes32("BALANCE"), balanceManager.address);
+    //await balanceManager.toggleUF();
     
     const PlanFactory = await ethers.getContractFactory("PlanManager");
     planManager = await PlanFactory.deploy();
@@ -182,6 +182,14 @@ describe("StakeManager", function () {
 
       let stake = await utilizationFarm.balanceOf(user.getAddress());
       await stakeManager.connect(user).withdrawNft(1);
+    });
+
+    it.only('should not be able to withdraw if cover is being borrowed', async function(){
+      let userBalance = BigNumber.from("100000000000000000000");
+      await stakeManager.connect(user).stakeNft(1);
+      await balanceManager.setBalance(await user.getAddress(), userBalance);
+      await planManager.connect(user).updatePlan([arNFT.address], [1]);
+      await expect(stakeManager.connect(user).withdrawNft(1)).to.be.revertedWith("May not withdraw NFT if it will bring staked amount below borrowed amount.");
     });
   });
 });

@@ -13,8 +13,8 @@ contract BalanceManagerMock {
         return price[_user];
     }
 
-    function updateExpireTime(address _planManager, address _user) external {
-        _planManager.call(abi.encodeWithSignature("updateExpireTime(address)", _user));
+    function updateExpireTime(address _planManager, address _user, uint256 _expiry) external {
+        _planManager.call(abi.encodeWithSignature("updateExpireTime(address,uint256)", _user, _expiry));
     }
     function changePrice(address _user, uint64 _price) external {
         price[_user] = _price;

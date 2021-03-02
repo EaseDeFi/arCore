@@ -121,7 +121,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         for (uint256 i = 0; i < _protocols.length; i++) {
             require(nftCoverPrice[_protocols[i]] != 0, "Protocol price is zero");
             
-            // nftCoverPrice is Wei per second per full Ether, so a cover amont in Wei must be divided by 18 decimals after.
+            // nftCoverPrice is Wei per second per full Ether, so a cover amont in Wei. This is divided after this loop.
             uint256 pricePerSec = nftCoverPrice[ _protocols[i] ].mul(_coverAmounts[i]);
             newPricePerSec = newPricePerSec.add(pricePerSec);
         }
@@ -339,12 +339,8 @@ contract PlanManager is ArmorModule, IPlanManager {
     {
         if (plans[_user].length == 0) return;
         Plan storage plan = plans[_user][plans[_user].length-1];
-        
-        if (plan.endTime > block.timestamp) {
-            plan.endTime = uint64(_expiry);
-        } else {
-            _removeLatestTotals(_user);
-        }
+        if (plan.endTime > block.timestamp && _expiry <= block.timestamp) _removeLatestTotals(_user);
+        plan.endTime = uint64(_expiry);
     }
     
     /**
