@@ -184,7 +184,7 @@ describe("StakeManager", function () {
       await stakeManager.connect(user).withdrawNft(1);
     });
 
-    it.only('should not be able to withdraw if cover is being borrowed', async function(){
+    it('should not be able to withdraw if cover is being borrowed', async function(){
       let userBalance = BigNumber.from("100000000000000000000");
       await stakeManager.connect(user).stakeNft(1);
       await balanceManager.setBalance(await user.getAddress(), userBalance);

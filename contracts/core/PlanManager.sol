@@ -9,7 +9,6 @@ import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
-
 /**
  * @dev Separating this off to specifically doKeep track of a borrower's plans.
 **/
