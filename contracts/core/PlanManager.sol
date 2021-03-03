@@ -260,7 +260,7 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @param _protocol The address of the protocol that was hacked. (Address used according to arNFT).
      * @param _hackTime The timestamp of when a hack happened.
      * @return index index of plan for hackTime
-     * @return check 
+     * @return check whether amount is allowed
     **/
     function checkCoverage(address _user, address _protocol, uint256 _hackTime, uint256 _amount)
       external

@@ -13,8 +13,8 @@ contract ExpireTracker {
     using SafeMath for uint64;
     using SafeMath for uint256;
 
-    // 1 week for each step.
-    uint64 public constant BUCKET_STEP = 3 days;
+    // 1 day for each step.
+    uint64 public constant BUCKET_STEP = 1 days;
 
     // indicates where to start from 
     // points where TokenInfo with (expiredAt / BUCKET_STEP) == index

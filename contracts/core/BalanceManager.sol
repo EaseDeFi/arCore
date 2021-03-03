@@ -10,7 +10,7 @@ import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IUtilizationFarm.sol';
-import 'hardhat/console.sol';
+
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -192,7 +192,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
        }
        
        uint256 rewardBalance = balances[getModule("REWARD")].lastBalance;
-       console.log("REWARDBALANCE", rewardBalance);
        // If staking contracts are sent too low of a reward, it can mess up distribution.
        if (rewardBalance >= 1 ether / 10) {
            IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
