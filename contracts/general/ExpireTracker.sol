@@ -57,6 +57,8 @@ contract ExpireTracker {
       internal 
     {
         require(expireId != 0, "info id 0 cannot be supported");
+        // If this is a replacement for a current balance, remove it's current link first.
+        if (infos[expireId].expiresAt > 0) pop(expireId);
         uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         if (head == 0) {
             // all the nfts are expired. so just add

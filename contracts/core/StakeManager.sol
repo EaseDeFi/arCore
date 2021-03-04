@@ -296,6 +296,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         for (uint256 i = 0; i < _nftIds.length; i++) {
             (/*coverId*/, /*status*/, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, uint256 validUntil, /*address scAddress*/, 
             /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftIds[i]);
+            require(nftOwners[_nftIds[i]] != address(0), "this nft does not belong here");
             ExpireTracker.push(uint96(_nftIds[i]),uint64(validUntil));
         }
     }
