@@ -12,7 +12,6 @@ import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IUtilizationFarm.sol';
-
 /**
  * @dev Encompasses all functions taken by stakers.
 **/
@@ -138,6 +137,9 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
             (/*coverId*/,  uint8 coverStatus, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, /*uint256 validUntil*/, /*address scAddress*/, 
             /*bytes4 coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
             
+            // Added after update in case someone initiated withdrawal before update, then executed after update, in which case their NFT is never removed.
+            if (ExpireTracker.infos[uint96(_nftId)].next > 0) _removeNft(_nftId);
+
             require(coverStatus == 0, "May not withdraw while claim is occurring.");
             
             address nftOwner = nftOwners[_nftId];
@@ -250,6 +252,54 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         emit RemovedNFT(user, scAddress, _nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
     }
     
+    /**
+     * @dev Need a force remove--at least temporarily--where owner can remove data relating to an NFT.
+     *      This necessity came about when updating the contracts and some users started withdrawal when _removeNFT
+     *      was in the second step of withdrawal, then executed the second step of withdrawal after _removeNFT had
+     *      been moved to the first step of withdrawal.
+    **/
+    function forceRemoveNft(address[] calldata _users, uint256[] calldata _nftIds)
+      external
+      onlyOwner
+    {
+        require(_users.length == _nftIds.length, "Array lengths must match.");
+        for (uint256 i = 0; i < _users.length; i++) {
+            uint256 nftId = _nftIds[i];
+            address user = _users[i];
+            (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, /*uint256 validuntil*/, address scAddress, 
+            /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(nftId);
+            //address user = nftOwners[_nftId];
+            // require(user != address(0), "NFT does not belong to this contract.");
+            require(nftOwners[nftId] == address(0) && ExpireTracker.infos[uint96(nftId)].next > 0, "NFT may not be force removed.");
+
+            ExpireTracker.pop(uint96(nftId));
+
+            uint256 weiSumAssured = sumAssured * (10 ** 18);
+            uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
+            _subtractCovers(user, nftId, weiSumAssured, secondPrice, scAddress);
+            
+            // Exit from utilization farming.
+            if (ufOn) IUtilizationFarm(getModule("UFS")).withdraw(user, secondPrice);
+
+            emit RemovedNFT(user, scAddress, nftId, weiSumAssured, secondPrice, coverPeriod, block.timestamp);
+        }
+    }
+
+    /**
+     * @dev Some NFT expiries used a different bucket step upon update and must be reset. 
+    **/
+    function forceResetExpires(uint256[] calldata _nftIds)
+      external
+      onlyOwner
+    {
+        for (uint256 i = 0; i < _nftIds.length; i++) {
+            (/*coverId*/, /*status*/, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, uint256 validUntil, /*address scAddress*/, 
+            /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftIds[i]);
+            require(nftOwners[_nftIds[i]] != address(0), "this nft does not belong here");
+            ExpireTracker.push(uint96(_nftIds[i]),uint64(validUntil));
+        }
+    }
+
     /**
      * @dev Add to the cover amount for the user and contract overall.
      * @param _user The user who submitted.

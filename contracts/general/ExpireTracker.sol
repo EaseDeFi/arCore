@@ -13,8 +13,8 @@ contract ExpireTracker {
     using SafeMath for uint64;
     using SafeMath for uint256;
 
-    // 1 week for each step.
-    uint64 public constant BUCKET_STEP = 3 days;
+    // 1 day for each step.
+    uint64 public constant BUCKET_STEP = 1 days;
 
     // indicates where to start from 
     // points where TokenInfo with (expiredAt / BUCKET_STEP) == index
@@ -57,6 +57,8 @@ contract ExpireTracker {
       internal 
     {
         require(expireId != 0, "info id 0 cannot be supported");
+        // If this is a replacement for a current balance, remove it's current link first.
+        if (infos[expireId].expiresAt > 0) pop(expireId);
         uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         if (head == 0) {
             // all the nfts are expired. so just add
