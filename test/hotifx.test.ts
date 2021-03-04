@@ -20,7 +20,7 @@ describe.only("Hotfix test", function() {
   let accounts: Signer[];
   let stakeManager: Contract;
   let owner: Signer;
-  before(async function(){
+  beforeEach(async function(){
     await hre.network.provider.request({
       method: "hardhat_impersonateAccount",
       params: [ARMOR_MULTISIG]
@@ -38,21 +38,28 @@ describe.only("Hotfix test", function() {
   it("should be able to call forceReset", async function(){
     const oldCheckpoint = TARGET_EXPIRE_AT.div(86400 * 3).mul(86400 * 3);
     let bucket = await stakeManager.checkPoints(oldCheckpoint);
-    console.log(bucket);
     await stakeManager.connect(owner).forceResetExpires([NFT_TO_RESCUE]);
     const newCheckpoint = TARGET_EXPIRE_AT.div(86400).mul(86400);
     bucket = await stakeManager.checkPoints(oldCheckpoint);
-    console.log(bucket);
+    // this thing does not needs to be called since we were lucky
   });
 
   it("should clean up the bucket", async function(){
     const checkpoint = TARGET_EXPIRE_AT.div(86400 * 3).mul(86400 * 3);
     let bucket = await stakeManager.checkPoints(checkpoint);
-    console.log(bucket);
+    // this thing does not needs to be called since we were lucky
   });
 
   it("should be able to force remove", async function(){
+    const info = await stakeManager.infos(NFT_TO_WITHDRAW[0]);
+    const info_prev = await stakeManager.infos(info.prev);
+    const info_next = await stakeManager.infos(info.next);
     await stakeManager.connect(owner).forceRemoveNft(NFT_OWNERS.slice(0,1), NFT_TO_WITHDRAW.slice(0,1));
+    const info_effect = await stakeManager.infos(NFT_TO_WITHDRAW[0]);
+    const info_prev_effect = await stakeManager.infos(info.prev);
+    const info_next_effect = await stakeManager.infos(info.next);
+    expect(info_prev_effect.next).to.equal(info.next);
+    expect(info_next_effect.prev).to.equal(info.prev);
   });
 
   it("should be able to withdraw when time passed", async function(){
@@ -62,9 +69,23 @@ describe.only("Hotfix test", function() {
     });
     const user = await ethers.provider.getSigner(NFT_OWNERS[1]);
     await increase(7 * 86400);
+    const info = await stakeManager.infos(NFT_TO_WITHDRAW[1]);
+    const info_prev = await stakeManager.infos(info.prev);
+    const info_next = await stakeManager.infos(info.next);
     await stakeManager.connect(user).withdrawNft(NFT_TO_WITHDRAW[1]);
-    await expect(stakeManager.connect(owner).forceRemoveNft(NFT_OWNERS.slice(1,2), NFT_TO_WITHDRAW.slice(1,2))).to.be.reverted;
+    const info_effect = await stakeManager.infos(NFT_TO_WITHDRAW[1]);
+    const info_prev_effect = await stakeManager.infos(info.prev);
+    const info_next_effect = await stakeManager.infos(info.next);
+    expect(info_prev_effect.next).to.equal(info.next);
+    expect(info_next_effect.prev).to.equal(info.prev);
+    const info_2 = await stakeManager.infos(NFT_TO_WITHDRAW[2]);
+    const info_prev_2 = await stakeManager.infos(info_2.prev);
+    const info_next_2 = await stakeManager.infos(info_2.next);
     await stakeManager.connect(user).withdrawNft(NFT_TO_WITHDRAW[2]);
-    await expect(stakeManager.connect(owner).forceRemoveNft(NFT_OWNERS.slice(2,3), NFT_TO_WITHDRAW.slice(2,3))).to.be.reverted;
+    const info_effect_2 = await stakeManager.infos(NFT_TO_WITHDRAW[2]);
+    const info_prev_effect_2 = await stakeManager.infos(info_2.prev);
+    const info_next_effect_2 = await stakeManager.infos(info_2.next);
+    expect(info_prev_effect_2.next).to.equal(info_2.next);
+    expect(info_next_effect_2.prev).to.equal(info_2.prev);
   });
 });
