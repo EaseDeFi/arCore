@@ -12,7 +12,6 @@ import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IUtilizationFarm.sol';
-
 /**
  * @dev Encompasses all functions taken by stakers.
 **/
