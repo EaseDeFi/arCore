@@ -12,7 +12,9 @@ const REWARD_MANAGER = "0x1337DEF17d00FEAeA1fb10E09cAfa56030349Af8";
 const UFS = "0x1337DEF1B1Ae35314b40e5A4b70e216A499b0E37";
 const ARMOR_MULTISIG = "0x1f28eD9D4792a567DaD779235c2b766Ab84D8E33";
 const NFT_TO_RESCUE = BigNumber.from(3531);
+const NFT_TO_RESCUE_2 = BigNumber.from(3533);
 const TARGET_EXPIRE_AT = BigNumber.from(1622548941);
+const TARGET_EXPIRE_AT_2 = BigNumber.from(1622550428);
 const NFT_TO_WITHDRAW = [3454, 3344, 3146]
 const NFT_OWNERS = [
   "0x8b43adb7c0e01ac5cc4af110c507683b24c648e5", 
@@ -47,13 +49,54 @@ describe.only("Hotfix test", function() {
     await toUpdate.connect(owner).upgradeTo(newStakeManager.address);
   });
 
-  it("should be able to call forceReset", async function(){
+  it.only("check", async function(){
     const oldCheckpoint = TARGET_EXPIRE_AT.div(86400 * 3).mul(86400 * 3);
-    let bucket = await stakeManager.checkPoints(oldCheckpoint);
-    await stakeManager.connect(owner).forceResetExpires([NFT_TO_RESCUE]);
+    console.log("CHECKPOINT : " + oldCheckpoint);
     const newCheckpoint = TARGET_EXPIRE_AT.div(86400).mul(86400);
+    console.log("SHOULD BE : " + newCheckpoint);
+    let bucket = await stakeManager.checkPoints(oldCheckpoint);
+    let info = await stakeManager.infos(bucket.head);
+    let id = bucket.head;
+    console.log("BUCKET HEAD : " + id.toNumber());
+    console.log(info);
+    console.log("HEAD EXPIRES AT : " + info.expiresAt.toNumber());
+    while(info.expiresAt.toNumber() != 0 && info.expiresAt.toNumber() >= oldCheckpoint) {
+      id = info.prev;
+      info = await stakeManager.infos(info.prev);
+    }
+    const start = id;
+    while(info.expiresAt.toNumber() != 0 && info.expiresAt.toNumber() < newCheckpoint.add(86400)) {
+      console.log("ID : " + id.toNumber());
+      console.log("PREV : " + info.prev.toNumber());
+      console.log("NEXT : " + info.next.toNumber());
+      console.log("EXPIRES AT : " + info.expiresAt.toNumber());
+      console.log("REAL BUCKET : " + info.expiresAt.div(86400).mul(86400));
+      id = info.next;
+      info = await stakeManager.infos(info.next);
+    }
+    await stakeManager.connect(owner).forceResetExpires([NFT_TO_RESCUE, NFT_TO_RESCUE_2]);
+    info = await stakeManager.infos(start);
+    id = start;
+    let before = info.expiresAt.toNumber();
+    while(info.expiresAt.toNumber() != 0 && info.expiresAt.toNumber() < newCheckpoint.add(86400)) {
+      console.log("####INFO###########");
+      console.log("ID : " + id.toNumber());
+      console.log("PREV : " + info.prev.toNumber());
+      console.log("NEXT : " + info.next.toNumber());
+      console.log("EXPIRES AT : " + info.expiresAt.toNumber());
+      expect(before <= info.expiresAt.toNumber()).to.equal(true);
+      before = info.expiresAt.toNumber();
+      console.log("BUCKET : " + info.expiresAt.div(86400).mul(86400));
+      const bucket_temp = await stakeManager.checkPoints(info.expiresAt.div(86400).mul(86400));
+      console.log("####BUCKET INFO####");
+      console.log("HEAD : " + bucket_temp.head.toNumber());
+      console.log("TAIL : " + bucket_temp.tail.toNumber());
+      id = info.next;
+      info = await stakeManager.infos(info.next);
+    }
     bucket = await stakeManager.checkPoints(oldCheckpoint);
-    // this thing does not needs to be called since we were lucky
+    expect(bucket.head).to.equal(0);
+    expect(bucket.tail).to.equal(0);
   });
 
   it("should clean up the bucket", async function(){
