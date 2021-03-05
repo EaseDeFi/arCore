@@ -94,32 +94,9 @@ describe.only("Hotfix test", function() {
       id = info.next;
       info = await stakeManager.infos(info.next);
     }
-  });
-
-  it("should be able to call forceReset", async function(){
-    const oldCheckpoint = TARGET_EXPIRE_AT.div(86400 * 3).mul(86400 * 3);
-    let bucket = await stakeManager.checkPoints(oldCheckpoint);
-    console.log("info");
-    console.log(await stakeManager.infos(NFT_TO_RESCUE));
-    console.log("CHECKPOINT : " + oldCheckpoint);
-    console.log(bucket);
-    await stakeManager.connect(owner).forceResetExpires([NFT_TO_RESCUE]);
-    const newCheckpoint = TARGET_EXPIRE_AT.div(86400).mul(86400);
     bucket = await stakeManager.checkPoints(oldCheckpoint);
-    // this thing does not needs to be called since we were lucky
-  });
-  
-  it("should be able to call forceReset", async function(){
-    const oldCheckpoint = TARGET_EXPIRE_AT_2.div(86400 * 3).mul(86400 * 3);
-    let bucket = await stakeManager.checkPoints(oldCheckpoint);
-    console.log("info");
-    console.log(await stakeManager.infos(NFT_TO_RESCUE_2));
-    console.log("CHECKPOINT : " + oldCheckpoint);
-    console.log(bucket);
-    await stakeManager.connect(owner).forceResetExpires([NFT_TO_RESCUE_2]);
-    const newCheckpoint = TARGET_EXPIRE_AT_2.div(86400).mul(86400);
-    bucket = await stakeManager.checkPoints(oldCheckpoint);
-    // this thing does not needs to be called since we were lucky
+    expect(bucket.head).to.equal(0);
+    expect(bucket.tail).to.equal(0);
   });
 
   it("should clean up the bucket", async function(){
