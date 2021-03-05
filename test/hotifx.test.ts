@@ -84,11 +84,7 @@ describe.only("Hotfix test", function() {
       console.log("PREV : " + info.prev.toNumber());
       console.log("NEXT : " + info.next.toNumber());
       console.log("EXPIRES AT : " + info.expiresAt.toNumber());
-      if(before <= info.expiresAt.toNumber()) {
-        console.log("SORTED");
-      }else {
-        console.error("NOT SORTED!!!!");
-      }
+      expect(before <= info.expiresAt.toNumber()).to.equal(true);
       before = info.expiresAt.toNumber();
       console.log("BUCKET : " + info.expiresAt.div(86400).mul(86400));
       const bucket_temp = await stakeManager.checkPoints(info.expiresAt.div(86400).mul(86400));

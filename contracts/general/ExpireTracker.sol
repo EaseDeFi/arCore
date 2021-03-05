@@ -3,7 +3,6 @@
 pragma solidity ^0.6.6;
 
 import '../libraries/SafeMath.sol';
-import 'hardhat/console.sol';
 /**
  * @title Expire Traker
  * @dev Keeps track of expired NFTs.
@@ -190,7 +189,6 @@ contract ExpireTracker {
                         checkPoints[bucket].head == info.next;
                     } else {
                         // delete whole checkpoint if bucket is now empty
-                        console.log("NOW EMPTY");
                         delete checkPoints[bucket];
                     }
                 } else if(checkPoints[bucket].tail == cursor){
