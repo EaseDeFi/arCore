@@ -47,7 +47,7 @@ export default {
       timeout: 1000000,
       forking: {
         url: "https://eth-mainnet.alchemyapi.io/v2/90dtUWHmLmwbYpvIeC53UpAICALKyoIu",
-        blockNumber: 11965438
+        blockNumber: 11976092
       }
     },
     coverage: {

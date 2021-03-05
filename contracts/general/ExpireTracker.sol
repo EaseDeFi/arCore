@@ -3,7 +3,7 @@
 pragma solidity ^0.6.6;
 
 import '../libraries/SafeMath.sol';
-
+import 'hardhat/console.sol';
 /**
  * @title Expire Traker
  * @dev Keeps track of expired NFTs.
@@ -160,9 +160,9 @@ contract ExpireTracker {
         }
     }
 
-    function pop(uint96 expireId) internal {
+    function _pop(uint96 expireId, uint256 bucketStep) private {
         uint64 expiresAt = infos[expireId].expiresAt;
-        uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
+        uint64 bucket = uint64( (expiresAt.div(bucketStep)).mul(bucketStep) );
         // check if bucket is empty
         // if bucket is empty, end
         if(checkPoints[bucket].head == 0){
@@ -186,10 +186,11 @@ contract ExpireTracker {
                 // if cursor was head of bucket
                 if(checkPoints[bucket].head == cursor){
                     // and cursor.next is still in same bucket, move head to cursor.next
-                    if(infos[info.next].expiresAt.div(BUCKET_STEP) == bucket.div(BUCKET_STEP)) {
+                    if(infos[info.next].expiresAt.div(bucketStep) == bucket.div(bucketStep)) {
                         checkPoints[bucket].head == info.next;
                     } else {
                         // delete whole checkpoint if bucket is now empty
+                        console.log("NOW EMPTY");
                         delete checkPoints[bucket];
                     }
                 } else if(checkPoints[bucket].tail == cursor){
@@ -207,6 +208,14 @@ contract ExpireTracker {
             // if not, continue -> since there can be same expires at with multiple expireId
         }
         revert("Info does not exist");
+    }
+
+    function pop(uint96 expireId) internal {
+        _pop(expireId, BUCKET_STEP);
+    }
+
+    function pop(uint96 expireId, uint256 step) internal {
+        _pop(expireId, step);
     }
 
     uint256[50] private __gap;
