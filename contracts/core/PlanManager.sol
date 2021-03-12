@@ -301,7 +301,7 @@ contract PlanManager is ArmorModule, IPlanManager {
       onlyModule("CLAIM")
     {
         Plan storage plan = plans[_user][_planIndex];
-        require(plan.endTime <= now, "Cannot redeem active plan, update plan to redeem properly");
+        require(plan.endTime <= now, "Cannot redeem active plan, update plan to redeem properly.");
 
         for (uint256 i = 0; i < plan.length; i++) {
             bytes32 key = _hashKey(_user,_planIndex,i);

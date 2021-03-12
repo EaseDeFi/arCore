@@ -3,17 +3,17 @@
 pragma solidity ^0.6.12;
 
 import '../interfaces/IArmorClient.sol';
-import '../libraries/ArmorCoreLibrary.sol';
+import '../libraries/ArmorCore.sol';
 
 /**
  * @dev ArmorClient is the main contract for non-Armor contracts to inherit when connecting to arCore. It contains all functionality needed for a contract to use arCore.
 **/
 contract ArmorClient {
 
-    // Address that has permission to submit proof-of-loss.
+    // Address that has permission to submit proof-of-loss. Armor will assign NFTs for this address to submit proof-of-loss for.
     address public armorController;
 
-    constructor() external {
+    constructor() internal {
         armorController = msg.sender;
     }
 
@@ -24,7 +24,7 @@ contract ArmorClient {
      * @param _addresses Ethereum addresses to send 0 Ether transactions to.
     **/
     function submitProofOfLoss(address payable[] calldata _addresses) external {
-        require(msg.sender == armorController,"Armor: only Armor controller may call this function.");
+        require(msg.sender == armorController || msg.sender == ArmorCore.getModule("CLAIM"),"Armor: only Armor controller or Claim Manager may call this function.");
         for(uint256 i = 0; i < _addresses.length; i++){
             _addresses[i].transfer(0);
         }
