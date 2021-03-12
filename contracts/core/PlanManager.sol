@@ -26,7 +26,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // StakeManager calls this when a new NFT is added to update what the price for that protocol is.
     // Cover price in ETH (1e18) of price per second per ETH covered.
-    mapping (address => uint256) public nftCoverPrice;
+    mapping (address => uint256) public override nftCoverPrice;
     
     // Mapping to doKeep track of how much coverage we've sold for each protocol.
     // smart contract address => total borrowed cover
@@ -47,7 +47,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     mapping (address => uint256) public arShields;
     
     // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
-    uint256 public markup;
+    uint256 public override markup;
 
     // Mapping = protocol => cover amount
     struct Plan {

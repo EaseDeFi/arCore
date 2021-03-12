@@ -5,6 +5,8 @@ pragma solidity ^0.6.6;
 interface IPlanManager {
   // Event to notify frontend of plan update.
   event PlanUpdate(address indexed user, address[] protocols, uint256[] amounts, uint256 endTime);
+  function markup() external view returns(uint256);
+  function nftCoverPrice(address _protocol) external view returns(uint256);
   function initialize(address _armorManager) external;
   function changePrice(address _scAddress, uint256 _pricePerAmount) external;
   function updatePlan(address[] calldata _protocols, uint256[] calldata _coverAmounts) external;
