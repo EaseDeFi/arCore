@@ -6,8 +6,13 @@ import "../libraries/SafeMath.sol";
 import "../interfaces/IArmorMaster.sol";
 import "../interfaces/IBalanceManager.sol";
 import "../interfaces/IPlanManager.sol";
+import "../interfaces/IClaimManager.sol";
 
+/**
+ * @dev ArmorCoreLibrary simplifies integration of Armor Core into other contracts. It contains most functionality needed for a contract to use arCore.
+**/
 library ArmorCoreLibrary {
+
     using SafeMath for uint256;
 
     IArmorMaster internal constant armorMaster = IArmorMaster(0x1337DEF1900cEaabf5361C3df6aF653D814c6348);
@@ -84,11 +89,14 @@ library ArmorCoreLibrary {
 
     /**
      * @dev Claim funds after a hack has occurred on a protected protocol.
+     * @param _protocol The protocol that was hacked.
+     * @param _hackTime The Unix timestamp at which the hack occurred. Determined by Armor DAO.
+     * @param _amount Amount of funds to claim (in Ether Wei).
     **/
-    function claim() internal {
-
+    function claim(address _protocol, uint256 _hackTime, uint256 _amount) internal {
+        IClaimManager claimManager = IClaimManager(getModule("CLAIM"));
+        claimManager.redeemClaim(_protocol, _hackTime, _amount);
     }
-    // Claim
 
     /**
      * @dev End Armor coverage. 
