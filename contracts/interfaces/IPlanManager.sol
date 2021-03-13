@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.6;
-pragma experimental ABIEncoderV2;
 
 interface IPlanManager {
   // Mapping = protocol => cover amount
@@ -18,6 +17,7 @@ interface IPlanManager {
     
   // Event to notify frontend of plan update.
   event PlanUpdate(address indexed user, address[] protocols, uint256[] amounts, uint256 endTime);
+  function userCoverageLimit(address _user, address _protocol) external view returns(uint256);
   function markup() external view returns(uint256);
   function nftCoverPrice(address _protocol) external view returns(uint256);
   function initialize(address _armorManager) external;
@@ -29,6 +29,4 @@ interface IPlanManager {
   function updateExpireTime(address _user, uint256 _expiry) external;
   function planRedeemed(address _user, uint256 _planIndex, address _protocol) external;
   function totalUsedCover(address _scAddress) external view returns (uint256);
-  function plans(address _user) external view returns (Plan[] calldata);
-  function protocolPlan(bytes32 _key) external view returns (ProtocolPlan calldata);
 }

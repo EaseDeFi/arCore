@@ -49,6 +49,7 @@ contract ClaimManager is ArmorModule, IClaimManager {
     **/
     function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount)
       external
+      override
       doKeep
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));

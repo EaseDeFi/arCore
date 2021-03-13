@@ -48,18 +48,6 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
     uint256 public override markup;
-
-    // Mapping = protocol => cover amount
-    struct Plan {
-        uint64 startTime;
-        uint64 endTime;
-        uint128 length;
-    }
-
-    struct ProtocolPlan {
-        uint64 protocolId;
-        uint192 amount;
-    }
     
     function initialize(
         address _armorMaster
@@ -85,6 +73,27 @@ contract PlanManager is ArmorModule, IPlanManager {
             end = plan.endTime;
         }
     }
+
+    function userCoverageLimit(address _user, address _protocol) external view override returns(uint256){
+        IStakeManager stakeManager = IStakeManager(getModule("STAKE"));
+        uint64 protocolId = stakeManager.protocolId(_protocol);
+       
+        uint256 idx = plans[_user].length - 1; 
+        Plan memory plan = plans[_user][idx];
+        uint256 length = uint256( plan.length );
+
+        uint256 currentCover = 0;
+        for (uint256 i = 0; i < length; i++) {
+            ProtocolPlan memory protocol = protocolPlan[ _hashKey(_user, idx, i) ];
+            if (protocol.protocolId == protocolId) currentCover = uint256( protocol.amount );
+        }
+
+        uint256 extraCover = coverageLeft(_protocol);
+
+        // Add current coverage because coverageLeft on planManager does not include what we're currently using.
+        return extraCover.add(currentCover);
+    }
+
     
     /*
      * @dev User can update their plan for cover amount on any protocol.
@@ -218,7 +227,7 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @param _protocol The address of the protocol we're determining coverage left for.
     **/
     function coverageLeft(address _protocol)
-      external
+      public
       override
       view
     returns (uint256) {

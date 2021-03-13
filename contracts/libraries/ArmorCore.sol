@@ -18,17 +18,6 @@ library ArmorCore {
 
     IArmorMaster internal constant armorMaster = IArmorMaster(0x1337DEF1900cEaabf5361C3df6aF653D814c6348);
 
-    struct Plan {
-        uint64 startTime;
-        uint64 endTime;
-        uint128 length;
-    }
-
-    struct ProtocolPlan {
-        uint64 protocolId;
-        uint192 amount;
-    }
-
     /**
      * @dev Get Armor module such as BalanceManager, PlanManager, etc.
      * @param _name Name of the module (such as "BALANCE").
@@ -68,24 +57,9 @@ library ArmorCore {
      * @return available Amount of cover that is available (in Wei) up to full amount desired.
     **/
     function availableCover(address _protocol, uint256 _amount) internal view returns (uint256 available) {
-        IStakeManager stakeManager = IStakeManager(getModule("STAKE"));
-        uint64 protocolId = stakeManager.protocolId(_protocol);
-        
         IPlanManager planManager = IPlanManager(getModule("PLAN"));
-        Plan[] memory plans = planManager.plans( address(this) );
-        Plan memory plan = plans[plans.length - 1];
-        uint256 length = uint256( plan.length );
-        
-        uint256 currentCover = 0;
-        for (uint256 i = 0; i < length; i++) {
-            ProtocolPlan memory protocolPlan = planManager.protocolPlan( _hashKey(address(this), plans.length - 1, i) );
-            if (protocolPlan.protocolId == protocolId) currentCover = uint256( protocolPlan.amount );
-        }
-        
-        uint256 extraCover = planManager.coverageLeft(_protocol);
-        
-        // Add current coverage because coverageLeft on planManager does not include what we're currently using.
-        return extraCover.add(currentCover) >= _amount ? _amount : extraCover.add(currentCover);
+        uint256 limit = planManager.userCoverageLimit(address(this), _protocol);
+        return limit >= _amount ? _amount : limit;
     }
 
     /**
