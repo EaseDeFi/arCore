@@ -21,7 +21,7 @@ const NFT_OWNERS = [
   "0xac8eb5c1c12cc1db3e37bb64cc9f2220e16395d9",
   "0xac8eb5c1c12cc1db3e37bb64cc9f2220e16395d9"
 ];
-describe.only("Hotfix test", function() {
+describe.skip("Hotfix test", function() {
   let accounts: Signer[];
   let stakeManager: Contract;
   let rewardManager: Contract;
@@ -49,7 +49,7 @@ describe.only("Hotfix test", function() {
     await toUpdate.connect(owner).upgradeTo(newStakeManager.address);
   });
 
-  it.only("check", async function(){
+  it("check", async function(){
     const oldCheckpoint = TARGET_EXPIRE_AT.div(86400 * 3).mul(86400 * 3);
     console.log("CHECKPOINT : " + oldCheckpoint);
     const newCheckpoint = TARGET_EXPIRE_AT.div(86400).mul(86400);
