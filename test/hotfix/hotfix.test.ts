@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import hre, { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
-import { increase } from "./utils";
+import { increase } from "../utils";
 function stringToBytes32(str: string) : string {
   return ethers.utils.formatBytes32String(str);
 }
