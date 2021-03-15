@@ -139,20 +139,4 @@ library ArmorCore {
         uint256[] memory emptyAmounts = new uint256[](0);
         planManager.updatePlan(emptyProtocols, emptyAmounts);
     }
-    
-    /**
-     * @dev Hash for protocol info identifier.
-     * @param _user Address of the user.
-     * @param _planIndex Index of the plan in the user's plan array.
-     * @param _protoIndex Index of the protocol in the plan.
-     * @return Hash for identifier for protocolPlan mapping.
-    **/
-    function _hashKey(address _user, uint256 _planIndex, uint256 _protoIndex)
-      internal
-      pure
-    returns (bytes32)
-    {
-        return keccak256(abi.encodePacked("ARMORFI.PLAN.", _user, _planIndex, _protoIndex));
-    }
-
 }
