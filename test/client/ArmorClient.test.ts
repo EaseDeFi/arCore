@@ -9,7 +9,7 @@ const PLAN_MANAGER = "0x1337DEF1373bB63196F3D1443cE11D8d962543bB";
 const CLAIM_MANAGER = "0x1337DEF1fdfDd82BA18083Fd0627d4ADb6CdC357";
 const BALANCE_MANAGER = "0x1337DEF1c5EbBd9840E6B25C4438E829555395AA";
 //for fork test
-describe.only("ArmorClient", function(){
+describe.skip("ArmorClient", function(){
   let client : Contract;
   let planManager : Contract;
   let balanceManager : Contract;
