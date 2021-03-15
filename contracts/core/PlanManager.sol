@@ -59,33 +59,49 @@ contract PlanManager is ArmorModule, IPlanManager {
         corePercent = 300;
     }
     
-    function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end){
+    function getCurrentPlan(address _user) external view override returns(uint256 idx, uint128 start, uint128 end){
         if(plans[_user].length == 0){
-            return(0,0);
+            return(0,0,0);
         }
         Plan memory plan = plans[_user][plans[_user].length-1];
         
         //return 0 if there is no active plan
         if(plan.endTime < now){
-            return(0,0);
+            return(0,0,0);
         } else {
+            idx = plans[_user].length - 1;
             start = plan.startTime;
             end = plan.endTime;
         }
+    }
+
+    function getProtocolPlan(address _user, uint256 _idx, address _protocol) external view returns(uint256 idx, uint64 protocolId, uint192 amount) {
+        IStakeManager stakeManager = IStakeManager(getModule("STAKE"));
+        uint256 length = plans[_user][_idx].length;
+        for(uint256 i = 0; i<length; i++){
+            ProtocolPlan memory protocol = protocolPlan[_hashKey(_user, _idx, i)];
+            address addr = stakeManager.protocolAddress(protocol.protocolId);
+            if(addr == _protocol){
+                return (i, protocol.protocolId, protocol.amount);
+            }
+        }
+        return(0,0,0);
     }
 
     function userCoverageLimit(address _user, address _protocol) external view override returns(uint256){
         IStakeManager stakeManager = IStakeManager(getModule("STAKE"));
         uint64 protocolId = stakeManager.protocolId(_protocol);
        
-        uint256 idx = plans[_user].length - 1; 
-        Plan memory plan = plans[_user][idx];
-        uint256 length = uint256( plan.length );
-
+        uint256 idx = plans[_user].length - 1;
         uint256 currentCover = 0;
-        for (uint256 i = 0; i < length; i++) {
-            ProtocolPlan memory protocol = protocolPlan[ _hashKey(_user, idx, i) ];
-            if (protocol.protocolId == protocolId) currentCover = uint256( protocol.amount );
+        if(idx != uint256(-1)){ 
+            Plan memory plan = plans[_user][idx];
+            uint256 length = uint256( plan.length );
+
+            for (uint256 i = 0; i < length; i++) {
+                ProtocolPlan memory protocol = protocolPlan[ _hashKey(_user, idx, i) ];
+                if (protocol.protocolId == protocolId) currentCover = uint256( protocol.amount );
+            }
         }
 
         uint256 extraCover = coverageLeft(_protocol);

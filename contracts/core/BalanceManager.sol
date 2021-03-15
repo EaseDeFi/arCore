@@ -10,7 +10,7 @@ import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IUtilizationFarm.sol';
-
+import 'hardhat/console.sol';
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -219,8 +219,11 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       override
       onlyModule("PLAN")
     {
+        console.log("AHHHH");
+        console.logAddress(_user);
         _updateBalance(_user);
         _priceChange(_user, _newPrice);
+        console.log("PRICE : ", _newPrice);
         if (_newPrice > 0) _adjustExpiry(_user, balances[_user].lastBalance.div(_newPrice).add(block.timestamp));
         else _adjustExpiry(_user, block.timestamp);
     }
@@ -309,6 +312,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       internal
     {
         if (_newExpiry == block.timestamp) {
+            console.log("MAYBE HERE??");
+            console.logAddress(_user);
             BalanceExpireTracker.pop(uint160(_user));
         } else {
             BalanceExpireTracker.push(uint160(_user), uint64(_newExpiry));
