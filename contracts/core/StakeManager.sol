@@ -292,13 +292,29 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       external
       onlyOwner
     {
+        uint64[] memory validUntils = new uint64[](_nftIds.length);
         for (uint256 i = 0; i < _nftIds.length; i++) {
             (/*coverId*/, /*status*/, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, uint256 validUntil, /*address scAddress*/, 
             /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftIds[i]);
             require(nftOwners[_nftIds[i]] != address(0), "this nft does not belong here");
             ExpireTracker.pop(uint96(_nftIds[i]), 86400);
             ExpireTracker.pop(uint96(_nftIds[i]), 86400*3);
-            ExpireTracker.push(uint96(_nftIds[i]),uint64(validUntil));
+            validUntils[i] = uint64(validUntil);
+        }
+        for (uint256 i = 0; i < _nftIds.length; i++) {
+            ExpireTracker.push(uint96(_nftIds[i]),uint64(validUntils[i]));
+        }
+    }
+    // set desired head and tail
+    function _resetBucket(uint64 _bucket, uint96 _head, uint96 _tail) internal {
+        require(_bucket % BUCKET_STEP == 0, "INVALID BUCKET");
+        checkPoints[_bucket].tail = _tail;
+        checkPoints[_bucket].head = _head;
+    }
+
+    function resetBuckets(uint64[] calldata _buckets, uint96[] calldata _heads, uint96[] calldata _tails) external onlyOwner{
+        for(uint256 i = 0 ; i< _buckets.length; i++){
+            _resetBucket(_buckets[i], _heads[i], _tails[i]);
         }
     }
 
