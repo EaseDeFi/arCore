@@ -81,6 +81,9 @@ describe.only("Hotfix test", function() {
 
   it("buckets ", async function(){
     const array = Array.from(buckets).sort();
+    const param0 = new Array<string>();
+    const param1 = new Array<string>();
+    const param2 = new Array<string>();
     for(let i = 0; i<array.length; i++){
       const bucket = await balanceManager.checkPoints(array[i]);
       const elems = bucketElements.get(array[i]);
@@ -94,9 +97,12 @@ describe.only("Hotfix test", function() {
         console.log("HEAD : " + elems[0]);
         console.log("TAIL : " + elems[elems.length - 1]);
         console.log("RESETTING...");
-        await balanceManager.connect(owner).resetBucket(array[i], elems[0], elems[elems.length - 1]);
+        param0.push(array[i].toString());
+        param1.push(elems[0].toString());
+        param2.push(elems[elems.length - 1].toString());
       }
     }
+    await balanceManager.connect(owner).resetBuckets(param0, param1, param2);
   });
   
   it("after cleanup : buckets", async function(){
@@ -104,18 +110,7 @@ describe.only("Hotfix test", function() {
     for(let i = 0; i<array.length; i++){
       const bucket = await balanceManager.checkPoints(array[i]);
       const elems = bucketElements.get(array[i]);
-      if(elems[0].toString() === bucket.head.toString() && elems[elems.length - 1].toString() === bucket.tail.toString()){
-      }else{
-        console.log("BUCKET : "+ array[i]);
-        console.log("ON-CHAIN data");
-        console.log("HEAD : " + bucket.head);
-        console.log("TAIL : " + bucket.tail);
-        console.log("SHOULD BE");
-        console.log("HEAD : " + elems[0]);
-        console.log("TAIL : " + elems[elems.length - 1]);
-        console.log("RESETTING...");
-        await balanceManager.connect(owner).resetBucket(array[i], elems[0], elems[elems.length - 1]);
-      }
+      expect(elems[0].toString() === bucket.head.toString() && elems[elems.length - 1].toString() === bucket.tail.toString()).to.equal(true);
     }
   });
 });

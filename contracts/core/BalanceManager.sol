@@ -413,10 +413,8 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     }
 
     // set desired head and tail
-    function resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) external onlyOwner {
+    function _resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) internal {
         require(_bucket % BUCKET_STEP == 0, "INVALID BUCKET");
-        //let's find real head by iterating from tail
-        Bucket memory bucket = checkPoints[_bucket];
         // check if tail is really a desired tail
         require(
             infos[infos[_tail].next].expiresAt >= _bucket + BUCKET_STEP &&
@@ -430,6 +428,12 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
             "head is not head");
         checkPoints[_bucket].tail = _tail;
         checkPoints[_bucket].head = _head;
+    }
+
+    function resetBuckets(uint64[] calldata _buckets, uint160[] calldata _heads, uint160[] calldata _tails) external onlyOwner{
+        for(uint256 i = 0 ; i< _buckets.length; i++){
+            _resetBucket(_buckets[i], _heads[i], _tails[i]);
+        }
     }
 }
 
