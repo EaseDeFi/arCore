@@ -62,7 +62,7 @@ library ArmorCore {
         return limit >= _amount ? _amount : limit;
     }
 
-    /**
+    /**  
      * @dev Find the price per second per Ether for the protocol.
      * @param _protocol Protocol we are finding the price for.
      * @return pricePerSecPerETH The price per second per each full Eth for the protocol.
@@ -96,6 +96,10 @@ library ArmorCore {
         planManager.updatePlan(protocols, amounts);
     }
 
+    /**
+     * @dev Return this contract's balance on the Armor Core BalanceManager.
+     * @return This contract's ablance on Armor Core.
+    **/
     function balanceOf() internal view returns (uint256) {
         IBalanceManager balanceManager = IBalanceManager(getModule("BALANCE"));
         return balanceManager.balanceOf( address(this) );

@@ -52,7 +52,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
 
     // Mapping of shields so we don't reward them for U.F.
     mapping (address => bool) public arShields;
-    
+     
     // Block withdrawals within 1 hour of depositing.
     modifier onceAnHour {
         require(block.timestamp >= balances[msg.sender].lastTime.add(1 hours), "You must wait an hour after your last update to withdraw.");
@@ -413,9 +413,9 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     }
 
     // set desired head and tail
-    function _resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) internal {
+    function resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) internal {
         require(_bucket % BUCKET_STEP == 0, "INVALID BUCKET");
-        // check if tail is really a desired tail
+
         require(
             infos[infos[_tail].next].expiresAt >= _bucket + BUCKET_STEP &&
             infos[_tail].expiresAt < _bucket + BUCKET_STEP &&
@@ -436,4 +436,3 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
     }
 }
-
