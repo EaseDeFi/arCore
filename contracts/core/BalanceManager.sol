@@ -10,7 +10,6 @@ import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
 import '../interfaces/IUtilizationFarm.sol';
-
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
  *      until they're sent to the StakeManager.
@@ -53,7 +52,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
 
     // Mapping of shields so we don't reward them for U.F.
     mapping (address => bool) public arShields;
-    
+     
     // Block withdrawals within 1 hour of depositing.
     modifier onceAnHour {
         require(block.timestamp >= balances[msg.sender].lastTime.add(1 hours), "You must wait an hour after your last update to withdraw.");
@@ -403,6 +402,37 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         arShields[_shield] = !arShields[_shield];
     }
-    
-}
 
+    // to reset the buckets
+    function resetExpiry(uint160[] calldata _idxs) external onlyOwner {
+        for(uint256 i = 0; i<_idxs.length; i++) {
+            require(infos[_idxs[i]].expiresAt != 0, "not in linkedlist");
+            BalanceExpireTracker.pop(_idxs[i]);
+            BalanceExpireTracker.push(_idxs[i], infos[_idxs[i]].expiresAt);
+        }
+    }
+
+    // set desired head and tail
+    function _resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) internal {
+        require(_bucket % BUCKET_STEP == 0, "INVALID BUCKET");
+
+        require(
+            infos[infos[_tail].next].expiresAt >= _bucket + BUCKET_STEP &&
+            infos[_tail].expiresAt < _bucket + BUCKET_STEP &&
+            infos[_tail].expiresAt >= _bucket,
+            "tail is not tail");
+        require(
+            infos[infos[_head].prev].expiresAt < _bucket &&
+            infos[_head].expiresAt < _bucket + BUCKET_STEP &&
+            infos[_head].expiresAt >= _bucket,
+            "head is not head");
+        checkPoints[_bucket].tail = _tail;
+        checkPoints[_bucket].head = _head;
+    }
+
+    function resetBuckets(uint64[] calldata _buckets, uint160[] calldata _heads, uint160[] calldata _tails) external onlyOwner{
+        for(uint256 i = 0 ; i< _buckets.length; i++){
+            _resetBucket(_buckets[i], _heads[i], _tails[i]);
+        }
+    }
+}

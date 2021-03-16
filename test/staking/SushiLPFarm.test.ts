@@ -179,19 +179,19 @@ describe("SushiLPFarm", function () {
     it('should be rewarded for all reward amount', async function(){
       await increase(86400*10);
       await mine();
+      const balanceBefore = await rewardToken.balanceOf(await user.getAddress());
       const earned = await lpfarm.earned(await user.getAddress());
       await lpfarm.connect(user).getReward();
       const balance = await rewardToken.balanceOf(await user.getAddress());
-      expect(earned).to.be.equal(balance);
+      expect(earned).to.be.equal(balance.sub(balanceBefore));
     });
 
     it('should match partial reward amount', async function(){
       await increase(86400*3);
-      await mine();
-      const earned = await lpfarm.earned(await user.getAddress());
+      const balanceBefore = await rewardToken.balanceOf(await user.getAddress());
       await lpfarm.connect(user).getReward();
       const balance = await rewardToken.balanceOf(await user.getAddress());
-      expect(earned).to.be.equal(balance);
+      expect(BigNumber.from("259200")).to.be.equal(balance.sub(balanceBefore));
     });
 
     it('should get sushi reward', async function(){

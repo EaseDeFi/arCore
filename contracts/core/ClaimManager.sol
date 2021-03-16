@@ -3,6 +3,7 @@
 pragma solidity ^0.6.6;
 
 import '../general/ArmorModule.sol';
+import '../interfaces/IArmorClient.sol';
 import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
@@ -48,6 +49,7 @@ contract ClaimManager is ArmorModule, IClaimManager {
     **/
     function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount)
       external
+      override
       doKeep
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
@@ -135,6 +137,16 @@ contract ClaimManager is ArmorModule, IClaimManager {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         confirmedHacks[hackId] = true;
         emit ConfirmedHack(hackId, _protocol, _hackTime);
+    }
+
+    /**
+     * @dev Called by Armor for now submits proof of loss when hack happened
+    **/
+    function submitProofOfLoss(address _client, uint256[] calldata _ids)
+      external
+      onlyOwner
+    {
+        IArmorClient(_client).submitProofOfLoss(_ids);
     }
 
     /**

@@ -43,7 +43,7 @@ contract BalanceExpireTracker {
         uint64 expiresAt;
     }
 
-    function expired() internal view returns(bool){
+    function expired() internal view returns(bool) {
         if(infos[head].expiresAt == 0) {
             return false;
         }
@@ -60,10 +60,10 @@ contract BalanceExpireTracker {
       internal 
     {
         require(expireId != EMPTY, "info id address(0) cannot be supported");
-        
+
         // If this is a replacement for a current balance, remove it's current link first.
         if (infos[expireId].expiresAt > 0) pop(expireId);
-        
+
         uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         if (head == EMPTY) {
             // all the nfts are expired. so just add
@@ -81,8 +81,7 @@ contract BalanceExpireTracker {
             // pushing nft is going to expire first
             // update head
             infos[head].prev = expireId;
-
-            infos[expireId] = ExpireMetadata(head, EMPTY, expiresAt);
+            infos[expireId] = ExpireMetadata(head, EMPTY,expiresAt);
             head = expireId;
             
             // update head of bucket
@@ -101,7 +100,6 @@ contract BalanceExpireTracker {
         // then check if depositing nft will last more than latest
         if (infos[tail].expiresAt <= expiresAt) {
             infos[tail].next = expireId;
-
             // push nft at tail
             infos[expireId] = ExpireMetadata(EMPTY,tail,expiresAt);
             tail = expireId;
@@ -194,7 +192,7 @@ contract BalanceExpireTracker {
                 if(checkPoints[bucket].head == cursor){
                     // and cursor.next is still in same bucket, move head to cursor.next
                     if(infos[info.next].expiresAt.div(BUCKET_STEP) == bucket.div(BUCKET_STEP)){
-                        checkPoints[bucket].head == info.next;
+                        checkPoints[bucket].head = info.next;
                     } else {
                         // delete whole checkpoint if bucket is now empty
                         delete checkPoints[bucket];
@@ -213,7 +211,9 @@ contract BalanceExpireTracker {
             }
             // if not, continue -> since there can be same expires at with multiple expireId
         }
-        revert("Info does not exist.");
+        //changed to return for consistency
+        return;
+        //revert("Info does not exist");
     }
 
     uint256[50] private __gap;

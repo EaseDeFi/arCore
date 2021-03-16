@@ -3,7 +3,6 @@
 pragma solidity ^0.6.6;
 
 import '../general/BalanceExpireTracker.sol';
-
 contract BalanceExpireTrackerMock is BalanceExpireTracker {
 
     uint160 public lastId;

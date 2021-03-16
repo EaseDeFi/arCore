@@ -199,8 +199,8 @@ describe("PlanManager", function () {
   describe('#getCurrentPlan()', function(){
     it('should return zeros when expired or empty', async function(){
       const empty = await planManager.getCurrentPlan(await user.getAddress());
-      expect(empty[0]).to.be.equal(0);
       expect(empty[1]).to.be.equal(0);
+      expect(empty[2]).to.be.equal(0);
       //expect(empty[2]).to.be.equal(0);
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
       await balanceManager.setBalance(await user.getAddress(), userBalance);
@@ -211,8 +211,8 @@ describe("PlanManager", function () {
       await increase(plan.end.add(1000).toNumber());
       await mine();
       const expired = await planManager.getCurrentPlan(await user.getAddress());
-      expect(expired[0]).to.be.equal(0);
       expect(expired[1]).to.be.equal(0);
+      expect(expired[2]).to.be.equal(0);
       //expect(expired[2]).to.be.equal(0);
     });
     it('should return appropriate values if active', async function(){

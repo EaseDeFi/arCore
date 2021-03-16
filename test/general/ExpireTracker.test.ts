@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { getTimestamp, increase } from "../utils";
-let step = BigNumber.from("259200");
+let step = BigNumber.from("86400");
 function getBucket(expire: BigNumber) : BigNumber {
   return (expire.div(step)).mul(step);
 }
@@ -494,7 +494,25 @@ describe("ExpireTracker", function(){
             expect(next_info.prev).to.be.equal(metadata_old.prev);
           });
         });
-        describe("when bucket had more than 2 elements", function(){
+        describe("when bucket had more than 3 elements and deleting is head", function(){
+          let metadata_old;
+          let bucket_old;
+          it("when head", async function(){
+            const id = (await tracker.tail()).sub(6);
+            metadata_old = await tracker.infos(id);
+            bucket_old = await tracker.checkPoints(getBucket(metadata_old.expiresAt));
+            metadata_old = await tracker.infos(bucket_old.head);
+            await tracker.remove(bucket_old.head);
+            const prev_info = await tracker.infos(metadata_old.prev);
+            const next_info = await tracker.infos(metadata_old.next);
+            expect(prev_info.next).to.be.equal(metadata_old.next);
+            expect(next_info.prev).to.be.equal(metadata_old.prev);
+            const bucket_new = await tracker.checkPoints(getBucket(metadata_old.expiresAt));
+            expect(bucket_new.head).to.be.equal(metadata_old.next);
+            expect(bucket_new.tail).to.be.equal(bucket_old.tail);
+          });
+        });
+        describe("when bucket had more than 3 elements", function(){
           let metadata_old;
           let bucket_old;
           beforeEach(async function(){

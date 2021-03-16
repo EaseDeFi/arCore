@@ -56,8 +56,10 @@ contract ExpireTracker {
       internal 
     {
         require(expireId != 0, "info id 0 cannot be supported");
+
         // If this is a replacement for a current balance, remove it's current link first.
         if (infos[expireId].expiresAt > 0) pop(expireId);
+
         uint64 bucket = uint64( (expiresAt.div(BUCKET_STEP)).mul(BUCKET_STEP) );
         if (head == 0) {
             // all the nfts are expired. so just add
@@ -74,8 +76,8 @@ contract ExpireTracker {
         if (infos[head].expiresAt >= expiresAt) {
             // pushing nft is going to expire first
             // update head
-            infos[expireId] = ExpireMetadata(head,0,expiresAt);
             infos[head].prev = expireId;
+            infos[expireId] = ExpireMetadata(head,0,expiresAt);
             head = expireId;
             
             // update head of bucket
@@ -93,9 +95,9 @@ contract ExpireTracker {
           
         // then check if depositing nft will last more than latest
         if (infos[tail].expiresAt <= expiresAt) {
+            infos[tail].next = expireId;
             // push nft at tail
             infos[expireId] = ExpireMetadata(0,tail,expiresAt);
-            infos[tail].next = expireId;
             tail = expireId;
             
             // update tail of bucket
@@ -186,7 +188,7 @@ contract ExpireTracker {
                 if(checkPoints[bucket].head == cursor){
                     // and cursor.next is still in same bucket, move head to cursor.next
                     if(infos[info.next].expiresAt.div(bucketStep) == bucket.div(bucketStep)) {
-                        checkPoints[bucket].head == info.next;
+                        checkPoints[bucket].head = info.next;
                     } else {
                         // delete whole checkpoint if bucket is now empty
                         delete checkPoints[bucket];
@@ -205,7 +207,9 @@ contract ExpireTracker {
             }
             // if not, continue -> since there can be same expires at with multiple expireId
         }
-        revert("Info does not exist");
+        //changed to return for consistency
+        return;
+        //revert("Info does not exist");
     }
 
     function pop(uint96 expireId) internal {

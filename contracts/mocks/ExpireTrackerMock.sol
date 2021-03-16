@@ -3,7 +3,6 @@
 pragma solidity ^0.6.6;
 
 import '../general/ExpireTracker.sol';
-import 'hardhat/console.sol';
 contract ExpireTrackerMock is ExpireTracker {
 
     uint96 public lastId;

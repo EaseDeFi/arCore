@@ -26,7 +26,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // StakeManager calls this when a new NFT is added to update what the price for that protocol is.
     // Cover price in ETH (1e18) of price per second per ETH covered.
-    mapping (address => uint256) public nftCoverPrice;
+    mapping (address => uint256) public override nftCoverPrice;
     
     // Mapping to doKeep track of how much coverage we've sold for each protocol.
     // smart contract address => total borrowed cover
@@ -47,19 +47,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     mapping (address => uint256) public arShields;
     
     // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
-    uint256 public markup;
-
-    // Mapping = protocol => cover amount
-    struct Plan {
-        uint64 startTime;
-        uint64 endTime;
-        uint128 length;
-    }
-
-    struct ProtocolPlan {
-        uint64 protocolId;
-        uint192 amount;
-    }
+    uint256 public override markup;
     
     function initialize(
         address _armorMaster
@@ -71,20 +59,57 @@ contract PlanManager is ArmorModule, IPlanManager {
         corePercent = 300;
     }
     
-    function getCurrentPlan(address _user) external view override returns(uint128 start, uint128 end){
+    function getCurrentPlan(address _user) external view override returns(uint256 idx, uint128 start, uint128 end){
         if(plans[_user].length == 0){
-            return(0,0);
+            return(0,0,0);
         }
         Plan memory plan = plans[_user][plans[_user].length-1];
         
         //return 0 if there is no active plan
         if(plan.endTime < now){
-            return(0,0);
+            return(0,0,0);
         } else {
+            idx = plans[_user].length - 1;
             start = plan.startTime;
             end = plan.endTime;
         }
     }
+
+    function getProtocolPlan(address _user, uint256 _idx, address _protocol) external view returns(uint256 idx, uint64 protocolId, uint192 amount) {
+        IStakeManager stakeManager = IStakeManager(getModule("STAKE"));
+        uint256 length = plans[_user][_idx].length;
+        for(uint256 i = 0; i<length; i++){
+            ProtocolPlan memory protocol = protocolPlan[_hashKey(_user, _idx, i)];
+            address addr = stakeManager.protocolAddress(protocol.protocolId);
+            if(addr == _protocol){
+                return (i, protocol.protocolId, protocol.amount);
+            }
+        }
+        return(0,0,0);
+    }
+
+    function userCoverageLimit(address _user, address _protocol) external view override returns(uint256){
+        IStakeManager stakeManager = IStakeManager(getModule("STAKE"));
+        uint64 protocolId = stakeManager.protocolId(_protocol);
+       
+        uint256 idx = plans[_user].length - 1;
+        uint256 currentCover = 0;
+        if(idx != uint256(-1)){ 
+            Plan memory plan = plans[_user][idx];
+            uint256 length = uint256( plan.length );
+
+            for (uint256 i = 0; i < length; i++) {
+                ProtocolPlan memory protocol = protocolPlan[ _hashKey(_user, idx, i) ];
+                if (protocol.protocolId == protocolId) currentCover = uint256( protocol.amount );
+            }
+        }
+
+        uint256 extraCover = coverageLeft(_protocol);
+
+        // Add current coverage because coverageLeft on planManager does not include what we're currently using.
+        return extraCover.add(currentCover);
+    }
+
     
     /*
      * @dev User can update their plan for cover amount on any protocol.
@@ -218,7 +243,7 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @param _protocol The address of the protocol we're determining coverage left for.
     **/
     function coverageLeft(address _protocol)
-      external
+      public
       override
       view
     returns (uint256) {
@@ -301,7 +326,7 @@ contract PlanManager is ArmorModule, IPlanManager {
       onlyModule("CLAIM")
     {
         Plan storage plan = plans[_user][_planIndex];
-        require(plan.endTime <= now, "Cannot redeem active plan, update plan to redeem properly");
+        require(plan.endTime <= now, "Cannot redeem active plan, update plan to redeem properly.");
 
         for (uint256 i = 0; i < plan.length; i++) {
             bytes32 key = _hashKey(_user,_planIndex,i);
