@@ -413,7 +413,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     }
 
     // set desired head and tail
-    function resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) internal {
+    function _resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) internal {
         require(_bucket % BUCKET_STEP == 0, "INVALID BUCKET");
 
         require(
