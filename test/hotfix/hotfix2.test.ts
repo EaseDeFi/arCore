@@ -85,12 +85,17 @@ describe.only("Hotfix test", function() {
     const param0 = new Array<string>();
     const param1 = new Array<string>();
     const param2 = new Array<string>();
-    for(let i = 0; i<array.length; i++){
-      const bucket = await balanceManager.checkPoints(array[i]);
-      const elems = bucketElements.get(array[i]);
-      if(elems[0].toString() === bucket.head.toString() && elems[elems.length - 1].toString() === bucket.tail.toString()){
+    for(let b=array[0]; b<=array[array.length - 1]; b+=3*86400){
+      const bucket = await balanceManager.checkPoints(b);
+      const elems = bucketElements.get(b);
+      if(elems === undefined){
+        console.log("SHOULD_BE_EMPTY : " + b);
+        console.log("HEAD : " + bucket.head);
+        console.log("TAIL : " + bucket.tail);
+      }
+      else if(elems[0].toString() === bucket.head.toString() && elems[elems.length - 1].toString() === bucket.tail.toString()){
       }else{
-        console.log("BUCKET : "+ array[i]);
+        console.log("BUCKET : "+ b);
         console.log("ON-CHAIN data");
         console.log("HEAD : " + bucket.head);
         console.log("TAIL : " + bucket.tail);
@@ -98,7 +103,7 @@ describe.only("Hotfix test", function() {
         console.log("HEAD : " + elems[0]);
         console.log("TAIL : " + elems[elems.length - 1]);
         console.log("RESETTING...");
-        param0.push(array[i].toString());
+        param0.push(b.toString());
         param1.push(elems[0].toString());
         param2.push(elems[elems.length - 1].toString());
       }
