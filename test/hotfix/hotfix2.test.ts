@@ -89,9 +89,11 @@ describe.only("Hotfix test", function() {
       const bucket = await balanceManager.checkPoints(b);
       const elems = bucketElements.get(b);
       if(elems === undefined){
-        console.log("SHOULD_BE_EMPTY : " + b);
-        console.log("HEAD : " + bucket.head);
-        console.log("TAIL : " + bucket.tail);
+        if(bucket.head.toNumber() != 0 || bucket.tail.toNumber() !=0){
+          console.log("SHOULD_BE_EMPTY : " + b);
+          console.log("HEAD : " + bucket.head);
+          console.log("TAIL : " + bucket.tail);
+        }
       }
       else if(elems[0].toString() === bucket.head.toString() && elems[elems.length - 1].toString() === bucket.tail.toString()){
       }else{
