@@ -47,7 +47,7 @@ describe.only("Hotfix test", function() {
       console.log("next : " + info.next);
       console.log("before : " + before.toNumber());
       console.log("expiresAt : " + info.expiresAt.toNumber());
-      console.log("IN ORDER? : " + (before.toNumber() <= info.expiresAt.toNumber()));
+      expect(before.toNumber() <= info.expiresAt.toNumber()).to.equal(true);
       console.log("BUCKET : " + getBucket(info.expiresAt));
       buckets.add(getBucket(info.expiresAt).toNumber());
       let elems = bucketElements.get(getBucket(info.expiresAt).toNumber());
@@ -73,6 +73,7 @@ describe.only("Hotfix test", function() {
       console.log("next : " + info.next);
       console.log("before : " + before.toNumber());
       console.log("expiresAt : " + info.expiresAt.toNumber());
+      expect(before.toNumber() >= info.expiresAt.toNumber()).to.equal(true);
       console.log("IN ORDER? : " + (before.toNumber() >= info.expiresAt.toNumber()));
       cursor = info.prev;
       before = info.expiresAt;
