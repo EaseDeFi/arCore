@@ -81,6 +81,8 @@ export class ArmorCore {
       ethers.utils.randomBytes(32),
       ethers.utils.randomBytes(32)
     );
+    await this.balanceManager.changeKeepLoops(3);
+    await this.stakeManager.changeKeepLoops(3);
   }
 
   async registerModule(key: string, contract: Contract) {

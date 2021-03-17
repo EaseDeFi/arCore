@@ -60,6 +60,7 @@ describe("BalanceManager", function () {
     utilizationFarm = await UtilizationFarm.deploy();
     await utilizationFarm.initialize(token.address, master.address);
     await master.connect(owner).registerModule(stringToBytes32("UFB"), utilizationFarm.address);
+    await balanceManager.connect(owner).changeKeepLoops(3);
   });
 
   describe("#initialize()", function() {

@@ -40,6 +40,7 @@ describe("UtilizationFarm", function () {
     stakeManager = await StakeFactory.deploy();
     await stakeManager.connect(owner).initialize(master.address);
     await master.connect(owner).registerModule(stringToBytes32("STAKE"), stakeManager.address);
+    await stakeManager.connect(owner).changeKeepLoops(3);
     
     const PlanFactory = await ethers.getContractFactory("PlanManagerMock");
     planManager = await PlanFactory.deploy();

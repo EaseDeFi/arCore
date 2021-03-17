@@ -17,7 +17,7 @@ const ARMOR_MULTISIG = "0x1f28eD9D4792a567DaD779235c2b766Ab84D8E33";
 function getBucket(expiry: BigNumber) : BigNumber {
   return (expiry.div(86400)).mul(86400);
 }
-describe("Hotfix test", function() {
+describe.skip("Hotfix test", function() {
   let accounts: Signer[];
   let stakeManager: Contract;
   let owner: Signer;
