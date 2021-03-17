@@ -74,8 +74,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
     function keep() external {
-        // Restrict each keep to 2 removals max.
-        for (uint256 i = 0; i < 2; i++) {
+        for (uint256 i = 0; i < keepLoops; i++) {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
             else return;
         }
@@ -403,4 +402,18 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     {
         ufOn = !ufOn;
     }
+
+    /**
+     * @dev Owner can change the amount of times the keep functions loops.
+    **/
+    function changeKeepLoops(uint256 _keepLoops)
+      external
+      onlyOwner
+    {
+      keepLoops = _keepLoops;
+    }
+
+    // Proxy paranoia. Used to determine how many keep actions should take place.
+    uint256 public keepLoops;
+
 }

@@ -110,7 +110,6 @@ contract PlanManager is ArmorModule, IPlanManager {
         return extraCover.add(currentCover);
     }
 
-    
     /*
      * @dev User can update their plan for cover amount on any protocol.
      * @param _protocols Addresses of the protocols that we want coverage for.

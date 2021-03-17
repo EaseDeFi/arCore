@@ -431,7 +431,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     }
 
     function resetBuckets(uint64[] calldata _buckets, uint160[] calldata _heads, uint160[] calldata _tails) external onlyOwner{
-        for(uint256 i = 0 ; i< _buckets.length; i++){
+        for(uint256 i = 0 ; i < _buckets.length; i++){
             _resetBucket(_buckets[i], _heads[i], _tails[i]);
         }
     }
