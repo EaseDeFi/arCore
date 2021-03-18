@@ -118,7 +118,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     **/
     function updatePlan(address[] calldata _protocols, uint256[] calldata _coverAmounts)
       external
-      doKeep
+      // doKeep
       override
     {
         require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
