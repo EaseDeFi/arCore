@@ -109,7 +109,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       payable
       override
-      doKeep
+      // doKeep
       update(msg.sender)
     {
         if ( referrers[msg.sender] == address(0) ) {
@@ -131,7 +131,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       override
       onceAnHour
-      doKeep
+      // doKeep
       update(msg.sender)
     {
         require(_amount > 0, "Must withdraw more than 0.");

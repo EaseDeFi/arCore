@@ -74,7 +74,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
     function keep() external {
-        for (uint256 i = 0; i < keepLoops; i++) {
+        for (uint256 i = 0; i < 2; i++) {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
             else return;
         }
@@ -87,7 +87,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function stakeNft(uint256 _nftId)
       public
-      doKeep
+      // doKeep
     {
         _stake(_nftId, msg.sender);
     }
@@ -98,7 +98,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function batchStakeNft(uint256[] memory _nftIds)
       public
-      doKeep
+      // doKeep
     {
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
@@ -112,7 +112,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function withdrawNft(uint256 _nftId)
       external
-      doKeep
+      // doKeep
     {
         // Check when this NFT is allowed to be withdrawn. If 0, set it.
         uint256 withdrawalTime = pendingWithdrawals[_nftId];
@@ -371,7 +371,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function allowProtocol(address _protocol, bool _allow)
       external
-      doKeep
+      // doKeep
       onlyOwner
     {
         if(protocolId[_protocol] == 0){
@@ -387,7 +387,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function changeWithdrawalDelay(uint256 _withdrawalDelay)
       external
-      doKeep
+      // doKeep
       onlyOwner
     {
         withdrawalDelay = _withdrawalDelay;
@@ -402,18 +402,5 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     {
         ufOn = !ufOn;
     }
-
-    /**
-     * @dev Owner can change the amount of times the keep functions loops.
-    **/
-    function changeKeepLoops(uint256 _keepLoops)
-      external
-      onlyOwner
-    {
-      keepLoops = _keepLoops;
-    }
-
-    // Proxy paranoia. Used to determine how many keep actions should take place.
-    uint256 public keepLoops;
 
 }
