@@ -86,6 +86,10 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
     }
 
+    function expireBalance(address _user) external override update(_user) {
+        require(balanceOf(_user) == 0, "Cannot expire when balance > 0");
+    }
+
     /**
      * @param _armorMaster Address of the ArmorMaster contract.
      **/

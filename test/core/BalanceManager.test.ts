@@ -163,7 +163,8 @@ describe("BalanceManager", function () {
 
       await increase(86400);
       // Connect from owner to trigger keep()
-      await balanceManager.connect(owner).deposit(await referrer.getAddress(), {value:amount});
+      await balanceManager.connect(owner).expireBalance(await user.getAddress());
+      await balanceManager.connect(owner).expireBalance(await dev.getAddress());
 
       let info = await balanceManager.infos(user.getAddress());
       expect(info.toString()).to.equal("0,0,0");
@@ -177,7 +178,7 @@ describe("BalanceManager", function () {
       await balanceManager.connect(user).deposit(await referrer.getAddress(), {value:amount});
       await planManager.mockChangePrice(balanceManager.address, await user.getAddress(),amount.div(1000));
       await increase(86400);
-      await balanceManager.connect(owner).deposit(await referrer.getAddress(), {value:amount});
+      await balanceManager.connect(owner).expireBalance(await user.getAddress());
       let balance = await balanceManager.balances(user.getAddress())
       expect(balance[1].toString()).to.be.equal('0');
     });

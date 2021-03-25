@@ -13,6 +13,9 @@ contract BalanceManagerMock {
         return price[_user];
     }
 
+    function expireBalance(address _user) external {
+    }
+
     function updateExpireTime(address _planManager, address _user, uint256 _expiry) external {
         _planManager.call(abi.encodeWithSignature("updateExpireTime(address,uint256)", _user, _expiry));
     }
