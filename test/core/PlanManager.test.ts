@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
-import { OrderedMerkleTree } from "../utils/Merkle";
 import { increase, getTimestamp, mine } from "../utils";
 function stringToBytes32(str: string) : string {
   return ethers.utils.formatBytes32String(str);
@@ -100,8 +99,23 @@ describe("PlanManager", function () {
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
-      const merkle = new OrderedMerkleTree([plan.root]);
-      expect(plan.root).to.equal(merkle.calculateRoot());
+    });
+
+    it("should be able to update to coverage limit", async function(){
+      await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
+      const limit = await planManager.connect(user).userCoverageLimit(user.getAddress(), balanceManager.address);
+      await planManager.connect(user).updatePlan([balanceManager.address], [limit]);
+      const plan = await planManager.getCurrentPlan(await user.getAddress());
+      const limitAfter = await planManager.connect(user).userCoverageLimit(user.getAddress(), balanceManager.address);
+      expect(limit).to.equal(limitAfter);
+      const limitOthers = await planManager.userCoverageLimit(unknownUser.getAddress(), balanceManager.address);
+      expect(limitOthers).to.equal(0);
+    });
+    
+    it("should fail if amount exceeds limit", async function(){
+      await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
+      const limit = await planManager.connect(user).userCoverageLimit(user.getAddress(), balanceManager.address);
+      await expect(planManager.connect(user).updatePlan([balanceManager.address], [limit.add(1)])).to.be.reverted;
     });
 
     it("should increase totalUsedCover", async function(){
@@ -114,12 +128,10 @@ describe("PlanManager", function () {
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(1000));
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       const plan = await planManager.getCurrentPlan(await user.getAddress());
-      const merkle = new OrderedMerkleTree([plan.root]);
-      const path = merkle.getPath(0);
       await increase(10000);
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
-      expect((await planManager.checkCoverage(await user.getAddress(), balanceManager.address, plan.end.sub(1), coverAmount, path)).check).to.equal(true);
-      expect((await planManager.checkCoverage(await unknownUser.getAddress(), balanceManager.address, plan.end.sub(1), coverAmount, path)).check).to.equal(false);
+      expect((await planManager.checkCoverage(await user.getAddress(), balanceManager.address, plan.end.sub(1), coverAmount)).check).to.equal(true);
+      expect((await planManager.checkCoverage(await unknownUser.getAddress(), balanceManager.address, plan.end.sub(1), coverAmount)).check).to.equal(false);
     });
 
     it("should be able to update when there is currenct plan", async function(){

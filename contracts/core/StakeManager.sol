@@ -74,7 +74,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
     function keep() external {
-        // Restrict each keep to 2 removals max.
         for (uint256 i = 0; i < 2; i++) {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
             else return;
@@ -88,7 +87,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function stakeNft(uint256 _nftId)
       public
-      doKeep
+      // doKeep
     {
         _stake(_nftId, msg.sender);
     }
@@ -99,7 +98,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function batchStakeNft(uint256[] memory _nftIds)
       public
-      doKeep
+      // doKeep
     {
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
@@ -113,7 +112,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function withdrawNft(uint256 _nftId)
       external
-      doKeep
+      // doKeep
     {
         // Check when this NFT is allowed to be withdrawn. If 0, set it.
         uint256 withdrawalTime = pendingWithdrawals[_nftId];
@@ -292,13 +291,29 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
       external
       onlyOwner
     {
+        uint64[] memory validUntils = new uint64[](_nftIds.length);
         for (uint256 i = 0; i < _nftIds.length; i++) {
             (/*coverId*/, /*status*/, /*uint256 sumAssured*/, /*uint16 coverPeriod*/, uint256 validUntil, /*address scAddress*/, 
             /*coverCurrency*/, /*premiumNXM*/, /*uint256 coverPrice*/, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftIds[i]);
             require(nftOwners[_nftIds[i]] != address(0), "this nft does not belong here");
             ExpireTracker.pop(uint96(_nftIds[i]), 86400);
             ExpireTracker.pop(uint96(_nftIds[i]), 86400*3);
-            ExpireTracker.push(uint96(_nftIds[i]),uint64(validUntil));
+            validUntils[i] = uint64(validUntil);
+        }
+        for (uint256 i = 0; i < _nftIds.length; i++) {
+            ExpireTracker.push(uint96(_nftIds[i]),uint64(validUntils[i]));
+        }
+    }
+    // set desired head and tail
+    function _resetBucket(uint64 _bucket, uint96 _head, uint96 _tail) internal {
+        require(_bucket % BUCKET_STEP == 0, "INVALID BUCKET");
+        checkPoints[_bucket].tail = _tail;
+        checkPoints[_bucket].head = _head;
+    }
+
+    function resetBuckets(uint64[] calldata _buckets, uint96[] calldata _heads, uint96[] calldata _tails) external onlyOwner{
+        for(uint256 i = 0 ; i< _buckets.length; i++){
+            _resetBucket(_buckets[i], _heads[i], _tails[i]);
         }
     }
 
@@ -356,7 +371,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function allowProtocol(address _protocol, bool _allow)
       external
-      doKeep
+      // doKeep
       onlyOwner
     {
         if(protocolId[_protocol] == 0){
@@ -372,7 +387,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function changeWithdrawalDelay(uint256 _withdrawalDelay)
       external
-      doKeep
+      // doKeep
       onlyOwner
     {
         withdrawalDelay = _withdrawalDelay;
@@ -387,4 +402,5 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     {
         ufOn = !ufOn;
     }
+
 }

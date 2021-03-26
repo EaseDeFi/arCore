@@ -15,7 +15,7 @@ const ARMOR_MULTISIG = "0x1f28eD9D4792a567DaD779235c2b766Ab84D8E33";
 function getBucket(expiry: BigNumber) : BigNumber {
   return (expiry.div(3*86400)).mul(3*86400);
 }
-describe.only("Hotfix test", function() {
+describe.skip("Hotfix test", function() {
   let accounts: Signer[];
   let balanceManager: Contract;
   let owner: Signer;
@@ -85,13 +85,19 @@ describe.only("Hotfix test", function() {
     const param0 = new Array<string>();
     const param1 = new Array<string>();
     const param2 = new Array<string>();
-    for(let b=array[0]; b<=array[array.length - 1]; b+=3*86400){
+    
+    //for(let b=array[0]; b<=array[array.length - 1]; b+=3*86400){
+    for( let i=0; i<array.length; i++){
+      let b = array[i];
+      console.log(b);
       const bucket = await balanceManager.checkPoints(b);
       const elems = bucketElements.get(b);
       if(elems === undefined){
-        console.log("SHOULD_BE_EMPTY : " + b);
-        console.log("HEAD : " + bucket.head);
-        console.log("TAIL : " + bucket.tail);
+        if(bucket.head.toNumber() != 0 || bucket.tail.toNumber() !=0){
+          console.log("SHOULD_BE_EMPTY : " + b);
+          console.log("HEAD : " + bucket.head);
+          console.log("TAIL : " + bucket.tail);
+        }
       }
       else if(elems[0].toString() === bucket.head.toString() && elems[elems.length - 1].toString() === bucket.tail.toString()){
       }else{
@@ -109,6 +115,12 @@ describe.only("Hotfix test", function() {
       }
     }
     await balanceManager.connect(owner).resetBuckets(param0, param1, param2);
+    console.log("buckets");
+    console.log(param0);
+    console.log("heads");
+    console.log(param1);
+    console.log("tails");
+    console.log(param2);
   });
   
   it("after cleanup : buckets", async function(){

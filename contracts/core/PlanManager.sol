@@ -48,6 +48,14 @@ contract PlanManager is ArmorModule, IPlanManager {
     
     // The amount of markup for Armor's service vs. the original cover cost. 200 == 200%.
     uint256 public override markup;
+
+    modifier checkExpiry(address _user) {
+        IBalanceManager balanceManager = IBalanceManager(getModule("BALANCE"));
+        if(balanceManager.balanceOf(_user) == 0 ){
+            balanceManager.expireBalance(_user);
+        }
+        _;
+    }
     
     function initialize(
         address _armorMaster
@@ -110,7 +118,6 @@ contract PlanManager is ArmorModule, IPlanManager {
         return extraCover.add(currentCover);
     }
 
-    
     /*
      * @dev User can update their plan for cover amount on any protocol.
      * @param _protocols Addresses of the protocols that we want coverage for.
@@ -119,27 +126,29 @@ contract PlanManager is ArmorModule, IPlanManager {
     **/
     function updatePlan(address[] calldata _protocols, uint256[] calldata _coverAmounts)
       external
-      doKeep
       override
+      checkExpiry(msg.sender)
+      // doKeep
     {
         require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
         require(_protocols.length <= 30, "You may not protect more than 30 protocols at once.");
+        IBalanceManager balanceManager = IBalanceManager(getModule("BALANCE"));
         
         // Need to get price of the protocol here
         if(plans[msg.sender].length > 0){
           Plan storage lastPlan = plans[msg.sender][plans[msg.sender].length - 1];
 
-          // First go through and subtract all old cover amounts.
-          _removeLatestTotals(msg.sender);
-          
-          // Set current plan to have ended now or when it ended previously.
-          lastPlan.endTime = lastPlan.endTime <= now ? lastPlan.endTime : uint64(now);
+          // this should happen only when plan is not expired yet
+          if(lastPlan.endTime > now) {
+              // First go through and subtract all old cover amounts.
+              _removeLatestTotals(msg.sender);
+              lastPlan.endTime = uint64(now);
+          }
         }
 
         _addNewTotals(_protocols, _coverAmounts);
         uint256 newPricePerSec;
         uint256 _markup = markup;
-        
         
         // Loop through protocols, find price per second, add to rate, add coverage amount to mapping.
         for (uint256 i = 0; i < _protocols.length; i++) {
@@ -158,13 +167,12 @@ contract PlanManager is ArmorModule, IPlanManager {
             Plan memory newPlan;
             newPlan = Plan(uint64(now), uint64(-1), uint128(0));
             plans[msg.sender].push(newPlan);
-            IBalanceManager(getModule("BALANCE")).changePrice(msg.sender, 0);
+            balanceManager.changePrice(msg.sender, 0);
             emit PlanUpdate(msg.sender, _protocols, _coverAmounts, uint64(-1));
             return;
         }
 
-        uint256 balance = IBalanceManager(getModule("BALANCE")).balanceOf(msg.sender);
-        uint256 endTime = balance.div(newPricePerSec).add(block.timestamp);
+        uint256 endTime = balanceManager.balanceOf(msg.sender).div(newPricePerSec).add(block.timestamp);
         
         // Let's make sure a user can pay for this for at least a week. Weird manipulation of utilization farming could happen otherwise.
         require(endTime >= block.timestamp.add(7 days), "Balance must be enough for 7 days of coverage.");
@@ -424,5 +432,10 @@ contract PlanManager is ArmorModule, IPlanManager {
             arShields[_shieldAddress[i]] = _shieldType[i];
         }
     }
-    
+
+    function forceAdjustTotalUsedCover(address[] calldata _protocols, uint256[] calldata _usedCovers) external onlyOwner {
+        for(uint256 i = 0; i<_protocols.length; i++){
+            totalUsedCover[_protocols[i]] = _usedCovers[i];
+        }
+    }
 }

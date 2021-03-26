@@ -75,8 +75,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
     function keep() external {
-        // Restrict each keep to 2 removes max.
-        for (uint256 i = 0; i < 2; i++) {
+        for (uint256 i = 0; i < keepLoops; i++) {
         
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
@@ -85,6 +84,10 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
             } else return;
             
         }
+    }
+
+    function expireBalance(address _user) external override update(_user) {
+        require(balanceOf(_user) == 0, "Cannot expire when balance > 0");
     }
 
     /**
@@ -110,7 +113,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       payable
       override
-      doKeep
+      // doKeep
       update(msg.sender)
     {
         if ( referrers[msg.sender] == address(0) ) {
@@ -132,7 +135,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       override
       onceAnHour
-      doKeep
+      // doKeep
       update(msg.sender)
     {
         require(_amount > 0, "Must withdraw more than 0.");
@@ -431,8 +434,22 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     }
 
     function resetBuckets(uint64[] calldata _buckets, uint160[] calldata _heads, uint160[] calldata _tails) external onlyOwner{
-        for(uint256 i = 0 ; i< _buckets.length; i++){
+        for(uint256 i = 0 ; i < _buckets.length; i++){
             _resetBucket(_buckets[i], _heads[i], _tails[i]);
         }
     }
+
+    /**
+     * @dev Owner can change the amount of times the keep functions loops.
+    **/
+    function changeKeepLoops(uint256 _keepLoops)
+      external
+      onlyOwner
+    {
+      keepLoops = _keepLoops;
+    }
+
+    // Proxy paranoia. Used to determine how many keep actions should take place.
+    uint256 public keepLoops;
+
 }
