@@ -34,6 +34,7 @@ contract TimelockOwned is Ownable {
     **/
     function implementProposal(uint256 _id)
       external
+      payable
       onlyOwner
     {
         Proposal memory proposal = proposals[_id];
