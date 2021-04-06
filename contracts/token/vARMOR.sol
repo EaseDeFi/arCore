@@ -18,6 +18,7 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
         uint256 varmor = armorToVArmor(_amount);
         _mint(msg.sender, varmor);
         _moveDelegates(address(0), _delegates[msg.sender], varmor);
+        // checkpoint for totalSupply
     }
 
     /// withdraw share
@@ -26,6 +27,7 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
         _burn(msg.sender, armorAmount);
         _moveDelegates(_delegates[msg.sender], address(0), armorAmount);
         armor.transfer(msg.sender, armorAmount);
+        // checkpoint for totalSupply
     }
 
     function armorToVArmor(uint256 _armor) public view returns(uint256) {
@@ -56,6 +58,12 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
 
     /// @notice The number of checkpoints for each account
     mapping (address => uint32) public numCheckpoints;
+
+
+    // totalSupply checkpoint
+    mapping (uint32 => Checkpoint) public checkpointsTotal;
+
+    uint32 public numCheckpointsTotal;
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
@@ -201,6 +209,41 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
             }
         }
         return checkpoints[account][lower].votes;
+    }
+    
+    function getPriorTotalVotes(uint blockNumber)
+        external
+        view
+        returns (uint256)
+    {
+        require(blockNumber < block.number, "vARMOR::getPriorTotalVotes: not yet determined");
+
+        uint32 nCheckpoints = numCheckpointsTotal;
+        
+        // First check most recent balance
+        if (checkpointsTotal[nCheckpoints - 1].fromBlock <= blockNumber) {
+            return checkpointsTotal[nCheckpoints - 1].votes;
+        }
+
+        // Next check implicit zero balance
+        if (checkpointsTotal[0].fromBlock > blockNumber) {
+            return 0;
+        }
+
+        uint32 lower = 0;
+        uint32 upper = nCheckpoints - 1;
+        while (upper > lower) {
+            uint32 center = upper - (upper - lower) / 2; // ceil, avoiding overflow
+            Checkpoint memory cp = checkpointsTotal[center];
+            if (cp.fromBlock == blockNumber) {
+                return cp.votes;
+            } else if (cp.fromBlock < blockNumber) {
+                lower = center;
+            } else {
+                upper = center - 1;
+            }
+        }
+        return checkpointsTotal[lower].votes;
     }
 
     function _delegate(address delegator, address delegatee)
