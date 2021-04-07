@@ -19,6 +19,7 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
         _mint(msg.sender, varmor);
         _moveDelegates(address(0), _delegates[msg.sender], varmor);
         // checkpoint for totalSupply
+        _writeCheckpointTotal(totalSupply());
     }
 
     /// withdraw share
@@ -28,6 +29,7 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
         _moveDelegates(_delegates[msg.sender], address(0), armorAmount);
         armor.transfer(msg.sender, armorAmount);
         // checkpoint for totalSupply
+        _writeCheckpointTotal(totalSupply());
     }
 
     function armorToVArmor(uint256 _armor) public view returns(uint256) {
@@ -275,6 +277,22 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
                 uint256 dstRepNew = dstRepOld.add(amount);
                 _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
             }
+        }
+    }
+
+    function _writeCheckpointTotal(
+        uint256 newTotal 
+    )
+        internal
+    {
+        uint32 nCheckpoints = numCheckpointsTotal;
+        uint32 blockNumber = safe32(block.number, "vARMOR::_writeCheckpoint: block number exceeds 32 bits");
+
+        if (nCheckpoints > 0 && checkpointsTotal[nCheckpoints - 1].fromBlock == blockNumber) {
+            checkpointsTotal[nCheckpoints - 1].votes = newTotal;
+        } else {
+            checkpointsTotal[nCheckpoints] = Checkpoint(blockNumber, newTotal);
+            numCheckpointsTotal = nCheckpoints + 1;
         }
     }
 
