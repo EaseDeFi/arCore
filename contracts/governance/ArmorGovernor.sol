@@ -1,6 +1,4 @@
-// SPDX-License-Identifier: (c) Armor.Fi DAO, 2021
-
-/// got from 
+// SPDX-License-Identifier: MIT
 /// https://etherscan.io/address/0x5e4be8bc9637f0eaa1a755019e06a68ce081d58f#code
 
 pragma solidity ^0.6.12;
@@ -14,6 +12,17 @@ contract GovernorAlpha {
 
     uint256 public thresholdRatio;
 
+    function setQuorumRatio(uint256 newRatio) external {
+        require(newRatio <= 1e18, "too big");
+        require(msg.sender == address(this), "!this");
+        quorumRatio = newRatio;
+    }
+
+    function setThresholdRatio(uint256 newRatio) external {
+        require(newRatio <= 1e18, "too big");
+        require(msg.sender == address(this), "!this");
+        thresholdRatio = newRatio;
+    }
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes(uint256 blockNumber) public view returns (uint) { return varmor.getPriorTotalVotes(blockNumber) * quorumRatio  / 1e18; } // 4% of VArmor
 
