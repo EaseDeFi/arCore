@@ -128,7 +128,6 @@ contract PlanManager is ArmorModule, IPlanManager {
       external
       override
       checkExpiry(msg.sender)
-      // doKeep
     {
         require(_protocols.length == _coverAmounts.length, "protocol and coverAmount length mismatch");
         require(_protocols.length <= 30, "You may not protect more than 30 protocols at once.");

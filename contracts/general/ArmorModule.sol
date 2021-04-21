@@ -19,11 +19,6 @@ contract ArmorModule {
         _;
     }
 
-    modifier doKeep() {
-        _master.keep();
-        _;
-    }
-
     modifier onlyModule(bytes32 _module) {
         string memory message = string(abi.encodePacked("only module ", _module.toString()," can call this function"));
         require(msg.sender == getModule(_module), message);

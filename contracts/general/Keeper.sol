@@ -3,5 +3,5 @@
 pragma solidity ^0.6.6;
 
 interface IKeeperRecipient {
-    function keep() external;
+    function keep(uint256 _length) external;
 }

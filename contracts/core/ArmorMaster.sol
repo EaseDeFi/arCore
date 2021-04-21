@@ -5,6 +5,7 @@ pragma solidity ^0.6.0;
 import "../general/Ownable.sol";
 import "../interfaces/IArmorMaster.sol";
 import "../general/Keeper.sol";
+import "../external/Keep3r/Keep3rV1.sol";
 
 /**
  * @dev ArmorMaster controls all jobs, address, and ownership in the Armor Core system.
@@ -13,11 +14,22 @@ import "../general/Keeper.sol";
  * @author Armor.fi -- Taek Lee
 **/
 contract ArmorMaster is Ownable, IArmorMaster {
+    Keep3rV1 public constant KEEP3R = Keep3rV1(0x1cEB5cB57C4D4E2b2433641b95Dd330A33185A44);
+
     mapping(bytes32 => address) internal _modules;
 
     // Keys for different jobs to be run. A job correlates to an address with a keep()
     // function, which is then called to run maintenance functions on the contract.
     bytes32[] internal _jobs;
+
+    modifier upkeep() {
+        uint _gasUsed = gasleft();
+        require(KEEP3R.keepers(msg.sender), "!K");
+        _;
+        uint _received = KEEP3R.KPRH().getQuoteLimit(_gasUsed - gasleft());
+        KEEP3R.receipt(address(KEEP3R), msg.sender, _received);
+    }
+
 
     function initialize() external {
         Ownable.initializeOwnable();
@@ -66,7 +78,19 @@ contract ArmorMaster is Ownable, IArmorMaster {
     **/
     function keep() external override {
         for(uint256 i = 0; i < _jobs.length; i++) {
-            IKeeperRecipient(_modules[_jobs[i]]).keep();
+            IKeeperRecipient(_modules[_jobs[i]]).keep(1);
+        }
+    }
+
+    function keep(uint256 _length) external {
+        for(uint256 i = 0; i < _jobs.length; i++){
+            IKeeperRecipient(_modules[_jobs[i]]).keep(_length);
+        }
+    }
+
+    function work(uint256[] calldata _jobIds, uint256[] calldata _keepRounds) external upkeep{
+        for(uint256 i = 0; i < _jobIds.length; i++) {
+            IKeeperRecipient(_modules[_jobs[_jobIds[i]]]).keep(_keepRounds[i]);
         }
     }
 

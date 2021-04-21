@@ -50,7 +50,6 @@ contract ClaimManager is ArmorModule, IClaimManager {
     function redeemClaim(address _protocol, uint256 _hackTime, uint256 _amount)
       external
       override
-      doKeep
     {
         bytes32 hackId = keccak256(abi.encodePacked(_protocol, _hackTime));
         require(confirmedHacks[hackId], "No hack with these parameters has been confirmed.");
@@ -73,7 +72,6 @@ contract ClaimManager is ArmorModule, IClaimManager {
     **/
     function submitNft(uint256 _nftId,uint256 _hackTime)
       external
-      doKeep
       // proof-of-loss requires this happen AFTER PoL is submitted so we can't risk users submitting before.
       onlyOwner
     {
@@ -106,7 +104,6 @@ contract ClaimManager is ArmorModule, IClaimManager {
     **/
     function redeemNft(uint256 _nftId)
       external
-      doKeep
     {
         IarNFT(getModule("ARNFT")).redeemClaim(_nftId);
     }

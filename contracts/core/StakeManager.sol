@@ -73,8 +73,8 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
      * @dev Keep function can be called by anyone to remove any NFTs that have expired. Also run when calling many functions.
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
-    function keep() external {
-        for (uint256 i = 0; i < 2; i++) {
+    function keep(uint256 _length) external {
+        for (uint256 i = 0; i < _length; i++) {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) _removeExpiredNft(head);
             else return;
         }
@@ -87,7 +87,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function stakeNft(uint256 _nftId)
       public
-      // doKeep
     {
         _stake(_nftId, msg.sender);
     }
@@ -98,7 +97,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function batchStakeNft(uint256[] memory _nftIds)
       public
-      // doKeep
     {
         // Loop through all submitted NFT IDs and stake them.
         for (uint256 i = 0; i < _nftIds.length; i++) {
@@ -112,7 +110,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function withdrawNft(uint256 _nftId)
       external
-      // doKeep
     {
         // Check when this NFT is allowed to be withdrawn. If 0, set it.
         uint256 withdrawalTime = pendingWithdrawals[_nftId];
@@ -371,7 +368,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function allowProtocol(address _protocol, bool _allow)
       external
-      // doKeep
       onlyOwner
     {
         if(protocolId[_protocol] == 0){
@@ -387,7 +383,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function changeWithdrawalDelay(uint256 _withdrawalDelay)
       external
-      // doKeep
       onlyOwner
     {
         withdrawalDelay = _withdrawalDelay;

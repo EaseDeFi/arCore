@@ -2,6 +2,7 @@ import "@nomiclabs/hardhat-waffle";
 import "solidity-coverage";
 import "hardhat-spdx-license-identifier";
 import "hardhat-gas-reporter";
+import "hardhat-etherscan-abi";
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 

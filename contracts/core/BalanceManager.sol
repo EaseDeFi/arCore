@@ -74,15 +74,13 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      * @dev Keep function can be called by anyone to balances that have been expired. This pays out addresses and removes used cover.
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
-    function keep() external {
-        for (uint256 i = 0; i < keepLoops; i++) {
-        
+    function keep(uint256 _length) external {
+        for (uint256 i = 0; i < _length; i++) {
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
                 uint256 oldBal = _updateBalance(oldHead);
                 _updateBalanceActions(oldHead, oldBal);
             } else return;
-            
         }
     }
 
@@ -113,7 +111,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       payable
       override
-      // doKeep
       update(msg.sender)
     {
         if ( referrers[msg.sender] == address(0) ) {
@@ -135,7 +132,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       override
       onceAnHour
-      // doKeep
       update(msg.sender)
     {
         require(_amount > 0, "Must withdraw more than 0.");
@@ -438,18 +434,5 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
             _resetBucket(_buckets[i], _heads[i], _tails[i]);
         }
     }
-
-    /**
-     * @dev Owner can change the amount of times the keep functions loops.
-    **/
-    function changeKeepLoops(uint256 _keepLoops)
-      external
-      onlyOwner
-    {
-      keepLoops = _keepLoops;
-    }
-
-    // Proxy paranoia. Used to determine how many keep actions should take place.
-    uint256 public keepLoops;
 
 }

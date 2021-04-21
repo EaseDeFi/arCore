@@ -115,7 +115,7 @@ contract RewardManager is BalanceWrapper, ArmorModule, IRewardManager{
         emit BalanceWithdrawn(_user, _nftId, _amount, totalSupply(), block.timestamp);
     }
 
-    function getReward(address payable user) public override updateReward(user) doKeep {
+    function getReward(address payable user) public override updateReward(user) {
         uint256 reward = earned(user);
         if (reward > 0) {
             rewards[user] = 0;
