@@ -31,7 +31,7 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
         if(dripEnd < block.timestamp){
             return settledArmor.add(dripAmount);
         }
-        return settledArmor.add(dripAmount*(dripEnd - block.timestamp)/dripDuration);
+        return settledArmor.add(dripAmount*(dripDuration - (dripEnd - block.timestamp))/dripDuration);
     }
 
     function notifyReward() external {
@@ -67,14 +67,14 @@ contract vARMOR is ERC20("voting Armor token", "vARMOR"), Ownable {
 
     function armorToVArmor(uint256 _armor) public view returns(uint256) {
         if(totalSupply() == 0){
-            return 1e18;
+            return _armor;
         }
-        return _armor * totalSupply() / activeArmor();
+        return _armor * totalSupply() / _armor;
     }
 
     function vArmorToArmor(uint256 _varmor) public view returns(uint256) {
         if(totalSupply() == 0){
-            return 1e18;
+            return 0;
         }
         return _varmor * activeArmor() / totalSupply();
     }

@@ -9,7 +9,7 @@ contract ERC20Mock is IERC20 {
     using SafeMath for uint256;
 
     string public name = "Mock Token";
-    string public symbol = "DOCK";
+    string public symbol = "MOCK";
     uint8 public decimals = 18;
     uint256 private _totalSupply;
 

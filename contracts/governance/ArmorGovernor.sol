@@ -4,6 +4,8 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
+import "../interfaces/IVArmor.sol";
+import "../interfaces/ITimelock.sol";
 contract GovernorAlpha {
     /// @notice The name of this contract
     string public constant name = "VArmor Governor Alpha";
@@ -39,7 +41,7 @@ contract GovernorAlpha {
     function votingPeriod() public pure returns (uint) { return 40_320; } // ~7 days in blocks (assuming 15s blocks)
 
     /// @notice The address of the VArmorswap Protocol Timelock
-    TimelockInterface public timelock;
+    ITimelock public timelock;
 
     /// @notice The address of the VArmorswap governance token
     IVArmor public varmor;
@@ -132,7 +134,7 @@ contract GovernorAlpha {
     constructor(address timelock_, address varmor_, uint256 quorum_, uint256 threshold_) public {
         require(quorum_ <= 1e18, "too big");
         require(threshold_ <= 1e18, "too big");
-        timelock = TimelockInterface(timelock_);
+        timelock = ITimelock(timelock_);
         varmor = IVArmor(varmor_);
         quorumRatio = quorum_;
         thresholdRatio = threshold_;
@@ -299,19 +301,4 @@ contract GovernorAlpha {
         assembly { chainId := chainid() }
         return chainId;
     }
-}
-/// timelock https://etherscan.io/address/0x1a9c8182c09f50c8318d769245bea52c32be35bc#code
-interface TimelockInterface {
-    function delay() external view returns (uint);
-    function GRACE_PERIOD() external view returns (uint);
-    function acceptAdmin() external;
-    function queuedTransactions(bytes32 hash) external view returns (bool);
-    function queueTransaction(address target, uint value, string calldata signature, bytes calldata data, uint eta) external returns (bytes32);
-    function cancelTransaction(address target, uint value, string calldata signature, bytes calldata data, uint eta) external;
-    function executeTransaction(address target, uint value, string calldata signature, bytes calldata data, uint eta) external payable returns (bytes memory);
-}
-
-interface IVArmor {
-    function getPriorTotalVotes(uint blockNumber) external view returns(uint96);
-    function getPriorVotes(address account, uint blockNumber) external view returns (uint96);
 }
