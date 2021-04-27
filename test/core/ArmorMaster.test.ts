@@ -1,6 +1,7 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import hre, { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
+import { increase } from "../utils";
 describe("ArmorMaster", function () {
   let accounts: Signer[];
   let armorMaster: Contract;
@@ -112,6 +113,53 @@ describe("ArmorMaster", function () {
 
     it("should not fail", async function(){
       await armorMaster.keep();
+    });
+  });
+
+  describe.skip("#work()", function(){
+    const KEEP3R_GOV = "0x0d5dc686d0a2abbfdafdfb4d0533e886517d4e83";
+    const KEEP3R_WHALE = "0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be";
+    const KEEP3R = "0x1cEB5cB57C4D4E2b2433641b95Dd330A33185A44";
+    let keep3rgov : Signer;
+    let keep3r : Contract;
+    let worker: Signer;
+    beforeEach(async function(){
+      worker = accounts[7];
+      await hre.network.provider.request({
+        method: "hardhat_impersonateAccount",
+        params: [KEEP3R_GOV]
+      });
+      keep3rgov = await ethers.provider.getSigner(KEEP3R_GOV);
+      keep3r = await ethers.getContractAt("Keep3rV1", KEEP3R);
+      await hre.network.provider.request({
+        method: "hardhat_impersonateAccount",
+        params: [KEEP3R_WHALE]
+      });
+      const whale = await ethers.provider.getSigner(KEEP3R_WHALE);
+      /// become keep3r
+      await keep3r.connect(whale).transfer(worker.getAddress(), BigNumber.from("10000000000000000000"));
+      await keep3r.connect(worker).bond(KEEP3R, BigNumber.from("10000000000000000000"));
+      await increase(259200 + 10000);
+      await keep3r.connect(worker).activate(KEEP3R);
+
+      await owner.sendTransaction({to:KEEP3R_GOV, value:BigNumber.from("1000000000000000000")});
+      const ModuleFactory = await ethers.getContractFactory("ArmorModuleMock");
+      armorModule = await ModuleFactory.deploy(armorMaster.address);
+      await armorMaster.connect(owner).registerModule(key,armorModule.address);
+      await keep3r.connect(keep3rgov).addJob(armorMaster.address);
+      /// add credit
+      await keep3r.connect(whale).approve(KEEP3R, BigNumber.from("10000000000000000000"));
+      await keep3r.connect(whale).addCredit(KEEP3R, armorMaster.address,BigNumber.from("10000000000000000000")); 
+    });
+    it("can work", async function(){
+      await armorMaster.connect(worker).work([key],[1]);
+    });
+    it("should increase keep3r balance", async function(){
+      const balance = await keep3r.balanceOf(worker.getAddress());
+      await armorMaster.connect(worker).work([key],[1]);
+      const after = await keep3r.balanceOf(worker.getAddress());
+      expect(after).to.gt(balance);
+      //console.log(after.toString());
     });
   });
 });

@@ -3,7 +3,7 @@ import hre, { ethers } from "hardhat";
 import { Contract, Signer, BigNumber, constants } from "ethers";
 import { getTimestamp, increase, mine } from "../utils";
 
-describe.only("vARMOR", function(){
+describe("vARMOR", function(){
   let armor: Contract;
   let varmor: Contract;
   let gov: Signer;
@@ -166,6 +166,6 @@ describe.only("vARMOR", function(){
         const numVotes = await varmor.getPriorVotes(delegatee.getAddress(), 0);
         expect(numVotes).to.equal(0);
       });
-    }); // End of #getPriorVotes()
-  }); // End of Midas Spec
+    });
+  });
 });

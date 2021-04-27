@@ -11,7 +11,7 @@ contract ArmorModuleMock is ArmorModule {
         initializeModule(_armorMaster);
     }
 
-    function keep() external {
+    function keep(uint256 length) external {
         counter++;
     }
 }

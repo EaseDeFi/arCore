@@ -49,6 +49,7 @@ describe("RewardManager", function () {
     await armor.balanceManager.deposit(await referrer.getAddress(), {value:userBalance});
     await armor.planManager.connect(user).updatePlan([armor.balanceManager.address], [coverAmount.mul(ETHER)]);
     await increase(86400*100);
+    await armor.master.keepMultiple(100);
     await armor.balanceManager.deposit(await referrer.getAddress(), {value:userBalance});
     await armor.balanceManager.releaseFunds();
   }

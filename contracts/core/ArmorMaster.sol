@@ -24,7 +24,7 @@ contract ArmorMaster is Ownable, IArmorMaster {
 
     modifier upkeep() {
         uint _gasUsed = gasleft();
-        require(KEEP3R.keepers(msg.sender), "!K");
+        require(KEEP3R.keepers(msg.sender), "!keeper");
         _;
         uint _received = KEEP3R.KPRH().getQuoteLimit(_gasUsed - gasleft());
         KEEP3R.receipt(address(KEEP3R), msg.sender, _received);
@@ -82,15 +82,15 @@ contract ArmorMaster is Ownable, IArmorMaster {
         }
     }
 
-    function keep(uint256 _length) external {
+    function keepMultiple(uint256 _length) external {
         for(uint256 i = 0; i < _jobs.length; i++){
             IKeeperRecipient(_modules[_jobs[i]]).keep(_length);
         }
     }
 
-    function work(uint256[] calldata _jobIds, uint256[] calldata _keepRounds) external upkeep{
+    function work(bytes32[] calldata _jobIds, uint256[] calldata _keepRounds) external upkeep{
         for(uint256 i = 0; i < _jobIds.length; i++) {
-            IKeeperRecipient(_modules[_jobs[_jobIds[i]]]).keep(_keepRounds[i]);
+            IKeeperRecipient(_modules[_jobIds[i]]).keep(_keepRounds[i]);
         }
     }
 

@@ -126,7 +126,7 @@ describe("PlanManager", function () {
       await armor.planManager.connect(user).updatePlan([armor.balanceManager.address], [coverAmount.mul(ETHER)]);
       const plan = await armor.planManager.getCurrentPlan(await user.getAddress());
       await increase(plan.end.add(1000).toNumber());
-      await armor.balanceManager.keep();
+      await armor.balanceManager.keep(100);
     });
     
     it('should update expiretime when there is active plan', async function(){
