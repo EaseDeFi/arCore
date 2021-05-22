@@ -70,24 +70,14 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         _updateBalanceActions(_user, _oldBal);
     }
 
-    /**
-     * @dev Keep function can be called by anyone to balances that have been expired. This pays out addresses and removes used cover.
-     *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
-    **/
-    function keep() external {
-        for (uint256 i = 0; i < keepLoops; i++) {
-        
-            if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
-                address oldHead = address(head);
-                uint256 oldBal = _updateBalance(oldHead);
-                _updateBalanceActions(oldHead, oldBal);
-            } else return;
-            
-        }
+    function expireBalance(address _user) public override update(_user) {
+        require(balanceOf(_user) == 0, "Cannot expire when balance > 0");
     }
 
-    function expireBalance(address _user) external override update(_user) {
-        require(balanceOf(_user) == 0, "Cannot expire when balance > 0");
+    function expireBalances(address[] calldata _users) external override {
+        for(uint256 i = 0; i<_users.length; i++){
+            expireBalance(_users[i]);
+        }
     }
 
     /**
@@ -113,7 +103,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       payable
       override
-      // doKeep
       update(msg.sender)
     {
         if ( referrers[msg.sender] == address(0) ) {
@@ -135,7 +124,6 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
       external
       override
       onceAnHour
-      // doKeep
       update(msg.sender)
     {
         require(_amount > 0, "Must withdraw more than 0.");
@@ -405,51 +393,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
     {
         arShields[_shield] = !arShields[_shield];
     }
-
-    // to reset the buckets
-    function resetExpiry(uint160[] calldata _idxs) external onlyOwner {
-        for(uint256 i = 0; i<_idxs.length; i++) {
-            require(infos[_idxs[i]].expiresAt != 0, "not in linkedlist");
-            BalanceExpireTracker.pop(_idxs[i]);
-            BalanceExpireTracker.push(_idxs[i], infos[_idxs[i]].expiresAt);
-        }
-    }
-
-    // set desired head and tail
-    function _resetBucket(uint64 _bucket, uint160 _head, uint160 _tail) internal {
-        require(_bucket % BUCKET_STEP == 0, "INVALID BUCKET");
-
-        require(
-            infos[infos[_tail].next].expiresAt >= _bucket + BUCKET_STEP &&
-            infos[_tail].expiresAt < _bucket + BUCKET_STEP &&
-            infos[_tail].expiresAt >= _bucket,
-            "tail is not tail");
-        require(
-            infos[infos[_head].prev].expiresAt < _bucket &&
-            infos[_head].expiresAt < _bucket + BUCKET_STEP &&
-            infos[_head].expiresAt >= _bucket,
-            "head is not head");
-        checkPoints[_bucket].tail = _tail;
-        checkPoints[_bucket].head = _head;
-    }
-
-    function resetBuckets(uint64[] calldata _buckets, uint160[] calldata _heads, uint160[] calldata _tails) external onlyOwner{
-        for(uint256 i = 0 ; i < _buckets.length; i++){
-            _resetBucket(_buckets[i], _heads[i], _tails[i]);
-        }
-    }
-
-    /**
-     * @dev Owner can change the amount of times the keep functions loops.
-    **/
-    function changeKeepLoops(uint256 _keepLoops)
-      external
-      onlyOwner
-    {
-      keepLoops = _keepLoops;
-    }
-
     // Proxy paranoia. Used to determine how many keep actions should take place.
-    uint256 public keepLoops;
+    uint256 public __deprecated__keepLoops;
 
 }
