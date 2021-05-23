@@ -31,7 +31,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     mapping (address => bool) public allowedProtocol;
     mapping (address => uint64) public override protocolId;
     mapping (uint64 => address) public override protocolAddress;
-    uint64 protocolCount;
+    uint64 public override protocolCount;
     
     // The total amount of cover that is currently being staked. scAddress => cover amount
     mapping (address => uint256) public override totalStakedAmount;
@@ -371,7 +371,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function allowProtocol(address _protocol, bool _allow)
       external
-      // doKeep
       onlyOwner
     {
         if(protocolId[_protocol] == 0){
@@ -387,7 +386,6 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     **/
     function changeWithdrawalDelay(uint256 _withdrawalDelay)
       external
-      // doKeep
       onlyOwner
     {
         withdrawalDelay = _withdrawalDelay;

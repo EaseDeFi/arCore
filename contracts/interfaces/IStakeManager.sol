@@ -3,6 +3,7 @@
 pragma solidity ^0.6.6;
 
 interface IStakeManager {
+    function protocolCount() external returns(uint64);
     function totalStakedAmount(address protocol) external view returns(uint256);
     function protocolAddress(uint64 id) external view returns(address);
     function protocolId(address protocol) external view returns(uint64);
