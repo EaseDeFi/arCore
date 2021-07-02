@@ -1,8 +1,4 @@
 // SPDX-License-Identifier: (c) Armor.Fi DAO, 2021
-
-pragma solidity ^0.6.6;
-
-import '../general/Keeper.sol';
 import '../general/ArmorModule.sol';
 import '../general/BalanceExpireTracker.sol';
 import '../interfaces/IERC20.sol';
@@ -75,7 +71,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
      *      This is external because the doKeep modifier calls back to ArmorMaster, which then calls back to here (and elsewhere).
     **/
     function keep() external {
-        for (uint256 i = 0; i < keepLoops; i++) {
+        for (uint256 i = 0; i < 2; i++) {
         
             if (infos[head].expiresAt != 0 && infos[head].expiresAt <= now) {
                 address oldHead = address(head);
@@ -439,17 +435,24 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
     }
 
-    /**
-     * @dev Owner can change the amount of times the keep functions loops.
-    **/
-    function changeKeepLoops(uint256 _keepLoops)
+    function manualUpdate(address[] calldata _users)
+      external
+    {
+        require(msg.sender == armorKeeper, "Only keeper may call this.");
+        for (uint256 i = 0; i < _users.length; i++) {
+            uint256 oldBal = _updateBalance(_users[i]);
+            _updateBalanceActions(_users[i], oldBal);
+        }
+    }
+
+    // Keeper is allowed to update people's balance. It's restricted so that DoS cannot occur through updates.
+    function changeKeeper(address _newKeeper)
       external
       onlyOwner
     {
-      keepLoops = _keepLoops;
+        armorKeeper = _newKeeper;
     }
 
-    // Proxy paranoia. Used to determine how many keep actions should take place.
-    uint256 public keepLoops;
+    address public armorKeeper;
 
 }

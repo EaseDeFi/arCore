@@ -9,9 +9,7 @@ import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
-/**
- * @dev Separating this off to specifically doKeep track of a borrower's plans.
-**/
+
 contract PlanManager is ArmorModule, IPlanManager {
     
     using SafeMath for uint;
@@ -371,7 +369,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     {
         if (plans[_user].length == 0) return;
         Plan storage plan = plans[_user][plans[_user].length-1];
-        if (plan.endTime > block.timestamp && _expiry <= block.timestamp) _removeLatestTotals(_user);
+        if (_expiry <= block.timestamp) _removeLatestTotals(_user);
         plan.endTime = uint64(_expiry);
     }
     

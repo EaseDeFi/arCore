@@ -60,7 +60,6 @@ describe("BalanceManager", function () {
     utilizationFarm = await UtilizationFarm.deploy();
     await utilizationFarm.initialize(token.address, master.address);
     await master.connect(owner).registerModule(stringToBytes32("UFB"), utilizationFarm.address);
-    await balanceManager.connect(owner).changeKeepLoops(3);
   });
 
   describe("#initialize()", function() {
@@ -228,6 +227,19 @@ describe("BalanceManager", function () {
         await balanceManager.connect(owner).deposit(await referrer.getAddress(), {value:amount});
         await balanceManager.connect(owner).releaseFunds();
       });
+      
+      it.only('should manual update', async function(){
+        await balanceManager.changeKeeper(user.getAddress());
+        await balanceManager.connect(dev).deposit(await referrer.getAddress(), {value:amount});
+        await planManager.mockChangePrice(balanceManager.address, await dev.getAddress(),amount.div(1000));
+        let balance = await balanceManager.balances(dev.getAddress());
+        console.log(balance.toString())
+        await increase(10);
+        await balanceManager.connect(user).manualUpdate([dev.getAddress()]);
+        balance = await balanceManager.balances(dev.getAddress());
+        console.log(balance.toString());
+      });
+
     });
 
     it("toggleShield", async function(){
