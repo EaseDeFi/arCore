@@ -434,6 +434,7 @@ contract PlanManager is ArmorModule, IPlanManager {
     function forceAdjustTotalUsedCover(address[] calldata _protocols, uint256[] calldata _usedCovers) external onlyOwner {
         for(uint256 i = 0; i<_protocols.length; i++){
             totalUsedCover[_protocols[i]] = _usedCovers[i];
+            coreCover[_protocols[i]] = _usedCovers[i];
         }
     }
 }
