@@ -5,6 +5,7 @@ import '../interfaces/IERC20.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IRewardManager.sol';
+import '../interfaces/IRewardManagerV2.sol';
 import '../interfaces/IUtilizationFarm.sol';
 /**
  * @dev BorrowManager is where borrowers do all their interaction and it holds funds
@@ -189,11 +190,12 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
            balances[getModule("GOVSTAKE")].lastBalance = 0;
        }
        
-       uint256 rewardBalance = balances[getModule("REWARD")].lastBalance;
+       uint256 rewardBalance = balances[getModule("REWARDV2")].lastBalance.add(balances[getModule("REWARD")].lastBalance);
        // If staking contracts are sent too low of a reward, it can mess up distribution.
        if (rewardBalance >= 1 ether / 10) {
-           IRewardManager(getModule("REWARD")).notifyRewardAmount{value: rewardBalance}(rewardBalance);
+           IRewardManagerV2(getModule("REWARDV2")).notifyRewardAmount{value: rewardBalance}();
            balances[getModule("REWARD")].lastBalance = 0;
+           balances[getModule("REWARDV2")].lastBalance = 0;
        }
     }
 
@@ -343,7 +345,7 @@ contract BalanceManager is ArmorModule, IBalanceManager, BalanceExpireTracker {
         }
         if (devAmount > 0) balances[devWallet].lastBalance = uint128( balances[devWallet].lastBalance.add(devAmount) );
         if (govAmount > 0) balances[getModule("GOVSTAKE")].lastBalance = uint128( balances[getModule("GOVSTAKE")].lastBalance.add(govAmount) );
-        if (nftAmount > 0) balances[getModule("REWARD")].lastBalance = uint128( balances[getModule("REWARD")].lastBalance.add(nftAmount) );
+        if (nftAmount > 0) balances[getModule("REWARDV2")].lastBalance = uint128( balances[getModule("REWARDV2")].lastBalance.add(nftAmount) );
     }
     
     /**

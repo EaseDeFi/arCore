@@ -16,32 +16,32 @@ export default {
     runOnCompile: true,
   },
   solidity: {
-    compilers :[
+    compilers: [
       {
         version: "0.6.12",
         settings: {
-          optimizer : {
+          optimizer: {
             enabled: true,
-            runs: 200
-          }
-        }
+            runs: 200,
+          },
+        },
       },
       {
         version: "0.5.17",
         settings: {
-          optimizer : {
+          optimizer: {
             enabled: true,
-            runs: 200
-          }
-        }
-      }
-    ]
+            runs: 200,
+          },
+        },
+      },
+    ],
   },
   networks: {
     hardhat: {
       gas: 10000000,
       accounts: {
-        accountsBalance: "10000000000000000000000000"
+        accountsBalance: "10000000000000000000000000",
       },
       allowUnlimitedContractSize: true,
       timeout: 1000000,
@@ -51,8 +51,10 @@ export default {
       //}
     },
     coverage: {
-      url: 'http://localhost:8555'
-    }
-  }
+      url: "http://localhost:8555",
+    },
+  },
+  mocha: {
+    timeout: "200000000",
+  },
 };
-

@@ -7,3 +7,4 @@ coverage/
 coverage.json
 gasReport.txt
 **/.DS_Store
+.env

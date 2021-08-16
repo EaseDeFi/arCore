@@ -16,6 +16,7 @@ describe("PlanManager", function () {
   let stakeManager: Contract;
   //signer instead of mock
   let claimManager: Signer;
+  let rewardManagerV2: Contract;
   //accounts settings
   let owner: Signer;
   let user: Signer;
@@ -23,6 +24,8 @@ describe("PlanManager", function () {
   const coverAmount = BigNumber.from("1000000000000000000");
   const price = BigNumber.from("10000000000000"); // this means 0.00001 eth per second
   const userBalance = BigNumber.from("100000000000000000000");
+  const rewardCycle = BigNumber.from("8640"); // 1 day
+
   beforeEach(async function () {
     //account setting
     accounts = await ethers.getSigners();
@@ -40,6 +43,14 @@ describe("PlanManager", function () {
     const StakeFactory = await ethers.getContractFactory("StakeManagerMock");
     stakeManager = await StakeFactory.deploy();
     await master.connect(owner).registerModule(stringToBytes32("STAKE"), stakeManager.address);
+    const RewardFactoryV2 = await ethers.getContractFactory("RewardManagerV2");
+    rewardManagerV2 = await RewardFactoryV2.deploy();
+    await rewardManagerV2
+      .connect(owner)
+      .initialize(master.address, rewardCycle);
+    await master
+      .connect(owner)
+      .registerModule(stringToBytes32("REWARDV2"), rewardManagerV2.address);
 
     const PlanFactory = await ethers.getContractFactory("PlanManager");
     planManager = await PlanFactory.deploy();
@@ -108,6 +119,9 @@ describe("PlanManager", function () {
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
       await planManager.connect(user).updatePlan([balanceManager.address], [coverAmount]);
       expect((await planManager.totalUsedCover(balanceManager.address)).toString()).to.equal(coverAmount.toString());
+      const pool = await rewardManagerV2.poolInfo(balanceManager.address);
+      expect(pool.protocol).to.equal(balanceManager.address);
+      expect(pool.allocPoint).to.equal(coverAmount);
     });
 
     it("should return true for checkCoverage", async function(){
@@ -160,7 +174,7 @@ describe("PlanManager", function () {
       await balanceManager.updateExpireTime(planManager.address, await user.getAddress(), 0);
     });
 
-    it.only('should correctly remove latest totals if needed', async function(){
+    it('should correctly remove latest totals if needed', async function(){
       await stakeManager.mockSetPlanManagerPrice(balanceManager.address, price);
       await balanceManager.setBalance(await user.getAddress(), userBalance);
       await stakeManager.mockLimitSetter(balanceManager.address, coverAmount.mul(10));
@@ -228,6 +242,16 @@ describe("PlanManager", function () {
       const plan = await planManager.getCurrentPlan(await user.getAddress());
       await increase(plan.end.add(1000).toNumber());
       await planManager.getCurrentPlan(await user.getAddress());
+    });
+  });
+
+  describe("#forceAdjustTotalUsedCover()", function () {
+    it("should force adjust totalUsedCover", async function(){
+      const newCoverAmount = "10000"
+      await planManager.connect(owner).forceAdjustTotalUsedCover([balanceManager.address], [newCoverAmount]);
+      const pool = await rewardManagerV2.poolInfo(balanceManager.address);
+      expect(pool.protocol).to.equal(balanceManager.address);
+      expect(pool.allocPoint).to.equal(newCoverAmount);
     });
   });
 });

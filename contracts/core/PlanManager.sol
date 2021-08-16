@@ -8,6 +8,7 @@ import '../libraries/MerkleProof.sol';
 import '../interfaces/IStakeManager.sol';
 import '../interfaces/IBalanceManager.sol';
 import '../interfaces/IPlanManager.sol';
+import '../interfaces/IRewardManagerV2.sol';
 import '../interfaces/IClaimManager.sol';
 
 contract PlanManager is ArmorModule, IPlanManager {
@@ -54,7 +55,7 @@ contract PlanManager is ArmorModule, IPlanManager {
         }
         _;
     }
-    
+
     function initialize(
         address _armorMaster
     ) external override {
@@ -204,11 +205,14 @@ contract PlanManager is ArmorModule, IPlanManager {
 
         uint256 idx = plans[_user].length - 1;
 
+        IRewardManagerV2 rewardManager = IRewardManagerV2(getModule("REWARDV2"));
+
         for (uint256 i = 0; i < plan.length; i++) {
             bytes32 key = _hashKey(_user, idx, i);
             ProtocolPlan memory protocol = protocolPlan[key];
             address protocolAddress = IStakeManager(getModule("STAKE")).protocolAddress(protocol.protocolId);
             totalUsedCover[protocolAddress] = totalUsedCover[protocolAddress].sub(uint256(protocol.amount));
+            rewardManager.updateAllocPoint(protocolAddress, totalUsedCover[protocolAddress]);
             
             uint256 shield = arShields[_user];
             if (shield == 1) {
@@ -227,13 +231,16 @@ contract PlanManager is ArmorModule, IPlanManager {
      * @param _newCoverAmounts Cover amounts (in Wei) that are being borrowed.
     **/
     function _addNewTotals(address[] memory _newProtocols, uint256[] memory _newCoverAmounts) internal {
+        IRewardManagerV2 rewardManager = IRewardManagerV2(getModule("REWARDV2"));
+
         for (uint256 i = 0; i < _newProtocols.length; i++) {
             
             (uint256 shield, uint256 allowed) = _checkBuyerAllowed(_newProtocols[i]);
             require(allowed >= _newCoverAmounts[i], "Exceeds allowed cover amount.");
             
             totalUsedCover[_newProtocols[i]] = totalUsedCover[_newProtocols[i]].add(_newCoverAmounts[i]);
-            
+            rewardManager.updateAllocPoint(_newProtocols[i], totalUsedCover[_newProtocols[i]]);
+
             if (shield == 1) {
                 arShieldCover[_newProtocols[i]] = arShieldCover[_newProtocols[i]].add(_newCoverAmounts[i]);
             } else if (shield == 2) {
@@ -432,9 +439,12 @@ contract PlanManager is ArmorModule, IPlanManager {
     }
 
     function forceAdjustTotalUsedCover(address[] calldata _protocols, uint256[] calldata _usedCovers) external onlyOwner {
+        IRewardManagerV2 rewardManager = IRewardManagerV2(getModule("REWARDV2"));
+
         for(uint256 i = 0; i<_protocols.length; i++){
             totalUsedCover[_protocols[i]] = _usedCovers[i];
             coreCover[_protocols[i]] = _usedCovers[i];
+            rewardManager.updateAllocPoint(_protocols[i], totalUsedCover[_protocols[i]]);
         }
     }
 }
