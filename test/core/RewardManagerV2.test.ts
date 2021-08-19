@@ -20,6 +20,7 @@ describe("RewardManagerV2", function () {
   let master: Contract;
 
   let alice: Signer;
+  let bob: Signer;
   let owner: Signer;
   let rewardDistribution: Signer;
   let rewardCycle = BigNumber.from("8640"); // 1 day
@@ -32,6 +33,7 @@ describe("RewardManagerV2", function () {
   beforeEach(async function () {
     accounts = await ethers.getSigners();
     alice = accounts[4];
+    bob = accounts[5];
     owner = accounts[0];
     rewardDistribution = accounts[2];
     stakeManager = accounts[1];
@@ -61,7 +63,6 @@ describe("RewardManagerV2", function () {
         await stakeManager.getAddress()
       );
 
-    // Edited contract for reward distribution to just be BalanceManager.
     await master
       .connect(owner)
       .registerModule(
@@ -113,7 +114,6 @@ describe("RewardManagerV2", function () {
       await rewardManagerV2
         .connect(rewardDistribution)
         .notifyRewardAmount({ value: rewardAmount });
-      let currentBlock = await getBlockNumber();
       await mineBlocks(100);
       await rewardManagerV2.connect(stakeManager).initPool(protocol1);
 
@@ -163,8 +163,6 @@ describe("RewardManagerV2", function () {
     });
 
     it("should keep reward when totalAllocPoint is zero", async function () {
-      // currentBlock = await getBlockNumber();
-
       const rewardAmount = ethers.utils.parseUnits("100", 18);
       const rewardAmount2 = ethers.utils.parseUnits("150", 18);
 
@@ -185,7 +183,6 @@ describe("RewardManagerV2", function () {
       expect(await rewardManagerV2.rewardCycleEnd()).to.equal(
         currentBlock.add(rewardCycle)
       );
-      // expect(await rewardManagerV2.lastRewardBlock()).to.equal(currentBlock);
       expect(await rewardManagerV2.accEthPerAlloc()).to.equal(0);
       expect(await rewardManagerV2.usedReward()).to.equal(0);
       expect(await rewardManagerV2.lastReward()).to.equal(
@@ -505,6 +502,249 @@ describe("RewardManagerV2", function () {
           .sub(receipt.gasUsed.mul(receipt.effectiveGasPrice))
       );
       let userInfo = await rewardManagerV2.userInfo(
+        protocol1,
+        await alice.getAddress()
+      );
+      expect(userInfo.amount).to.equal(depositAmount);
+      expect(userInfo.rewardDebt).to.equal(
+        depositAmount.mul(accEthPerShare).div(rewardUnit)
+      );
+    });
+
+    it("should calculate reward correctly after other deposits", async function () {
+      await mineBlocks(100);
+
+      const depositAmount1 = ethers.utils.parseUnits("5", 18);
+      await rewardManagerV2
+        .connect(stakeManager)
+        .deposit(await bob.getAddress(), protocol1, depositAmount1, 1);
+
+      let currentBlock = await getBlockNumber();
+      let accEthPerAlloc = rewardAmount
+        .div(rewardCycle)
+        .mul(BigNumber.from("102"))
+        .mul(rewardUnit)
+        .div(protocol1Cover.add(protocol2Cover));
+      expect(await rewardManagerV2.accEthPerAlloc()).to.equal(accEthPerAlloc);
+      let poolReward = accEthPerAlloc.mul(protocol1Cover).div(rewardUnit);
+      let accEthPerShare = poolReward.mul(rewardUnit).div(depositAmount);
+      expect(await rewardManagerV2.lastRewardBlock()).to.equal(currentBlock);
+      let pool = await rewardManagerV2.poolInfo(protocol1);
+      expect(pool.totalStaked).to.equal(depositAmount.add(depositAmount1));
+      expect(pool.accEthPerShare).to.equal(accEthPerShare);
+      expect(pool.rewardDebt).to.equal(poolReward);
+
+      let bobRewardDebt = depositAmount1.mul(accEthPerShare).div(rewardUnit);
+      let userInfo = await rewardManagerV2.userInfo(
+        protocol1,
+        await bob.getAddress()
+      );
+      expect(userInfo.amount).to.equal(depositAmount1);
+      expect(userInfo.rewardDebt).to.equal(bobRewardDebt);
+
+      await mineBlocks(50);
+
+      let balanceBefore = await owner.provider.getBalance(
+        await alice.getAddress()
+      );
+
+      let tx = await rewardManagerV2.connect(alice).claimReward(protocol1);
+      currentBlock = await getBlockNumber();
+
+      let receipt = await tx.wait(1);
+      accEthPerAlloc = rewardAmount
+        .div(rewardCycle)
+        .mul(BigNumber.from("153"))
+        .mul(rewardUnit)
+        .div(protocol1Cover.add(protocol2Cover));
+      expect(await rewardManagerV2.accEthPerAlloc()).to.equal(accEthPerAlloc);
+
+      let poolDebt = poolReward;
+      poolReward = accEthPerAlloc
+        .mul(protocol1Cover)
+        .div(rewardUnit)
+        .sub(poolDebt);
+      accEthPerShare = poolReward
+        .mul(rewardUnit)
+        .div(depositAmount.add(depositAmount1))
+        .add(accEthPerShare);
+      expect(await rewardManagerV2.lastRewardBlock()).to.equal(currentBlock);
+      pool = await rewardManagerV2.poolInfo(protocol1);
+      expect(pool.totalStaked).to.equal(depositAmount.add(depositAmount1));
+      expect(pool.accEthPerShare).to.equal(accEthPerShare);
+      expect(pool.rewardDebt).to.equal(poolReward.add(poolDebt));
+
+      let balanceAfter = await owner.provider.getBalance(
+        await alice.getAddress()
+      );
+      expect(balanceAfter.sub(balanceBefore)).to.equal(
+        depositAmount
+          .mul(accEthPerShare)
+          .div(rewardUnit)
+          .sub(receipt.gasUsed.mul(receipt.effectiveGasPrice))
+      );
+      userInfo = await rewardManagerV2.userInfo(
+        protocol1,
+        await alice.getAddress()
+      );
+      expect(userInfo.amount).to.equal(depositAmount);
+      expect(userInfo.rewardDebt).to.equal(
+        depositAmount.mul(accEthPerShare).div(rewardUnit)
+      );
+
+      balanceBefore = await owner.provider.getBalance(await bob.getAddress());
+
+      tx = await rewardManagerV2.connect(bob).claimReward(protocol1);
+      currentBlock = await getBlockNumber();
+
+      receipt = await tx.wait(1);
+
+      accEthPerAlloc = rewardAmount
+        .div(rewardCycle)
+        .mul(BigNumber.from("154"))
+        .mul(rewardUnit)
+        .div(protocol1Cover.add(protocol2Cover));
+      expect(await rewardManagerV2.accEthPerAlloc()).to.equal(accEthPerAlloc);
+
+      poolDebt = poolDebt.add(poolReward);
+      poolReward = accEthPerAlloc
+        .mul(protocol1Cover)
+        .div(rewardUnit)
+        .sub(poolDebt);
+      accEthPerShare = poolReward
+        .mul(rewardUnit)
+        .div(depositAmount.add(depositAmount1))
+        .add(accEthPerShare);
+      expect(await rewardManagerV2.lastRewardBlock()).to.equal(currentBlock);
+      pool = await rewardManagerV2.poolInfo(protocol1);
+      expect(pool.totalStaked).to.equal(depositAmount.add(depositAmount1));
+      expect(pool.accEthPerShare).to.equal(accEthPerShare);
+      expect(pool.rewardDebt).to.equal(poolReward.add(poolDebt));
+
+      balanceAfter = await owner.provider.getBalance(await bob.getAddress());
+      expect(balanceAfter.sub(balanceBefore)).to.equal(
+        depositAmount1
+          .mul(accEthPerShare)
+          .div(rewardUnit)
+          .sub(receipt.gasUsed.mul(receipt.effectiveGasPrice))
+          .sub(bobRewardDebt)
+      );
+      userInfo = await rewardManagerV2.userInfo(
+        protocol1,
+        await bob.getAddress()
+      );
+      expect(userInfo.amount).to.equal(depositAmount1);
+      expect(userInfo.rewardDebt).to.equal(
+        depositAmount1.mul(accEthPerShare).div(rewardUnit)
+      );
+    });
+
+    it("should calculate reward correctly after other pool initialized", async function () {
+      const protocol3Cover = BigNumber.from("3000");
+      const protocol3 = generateRandomAddress();
+      await planManager.setTotalUsedCover(protocol3, protocol3Cover);
+      await mineBlocks(100);
+
+      const depositAmount1 = ethers.utils.parseUnits("5", 18);
+      const depositAmount2 = ethers.utils.parseUnits("8", 18);
+      await rewardManagerV2
+        .connect(stakeManager)
+        .deposit(await bob.getAddress(), protocol3, depositAmount1, 1);
+
+      let currentBlock = await getBlockNumber();
+      let accEthPerAlloc = rewardAmount
+        .div(rewardCycle)
+        .mul(BigNumber.from("103"))
+        .mul(rewardUnit)
+        .div(protocol1Cover.add(protocol2Cover));
+      expect(await rewardManagerV2.accEthPerAlloc()).to.equal(accEthPerAlloc);
+      let rewardDebt3 = accEthPerAlloc.mul(protocol3Cover).div(rewardUnit);
+      let pool = await rewardManagerV2.poolInfo(protocol3);
+      expect(pool.totalStaked).to.equal(depositAmount1);
+      expect(pool.accEthPerShare).to.equal(0);
+      expect(pool.rewardDebt).to.equal(rewardDebt3);
+
+      let userInfo = await rewardManagerV2.userInfo(
+        protocol3,
+        await bob.getAddress()
+      );
+      expect(userInfo.amount).to.equal(depositAmount1);
+      expect(userInfo.rewardDebt).to.equal(0);
+
+      await mineBlocks(50);
+
+      await rewardManagerV2
+        .connect(stakeManager)
+        .deposit(await bob.getAddress(), protocol1, depositAmount2, 1);
+      accEthPerAlloc = rewardAmount
+        .div(rewardCycle)
+        .mul(BigNumber.from("51"))
+        .mul(rewardUnit)
+        .div(protocol1Cover.add(protocol2Cover).add(protocol3Cover))
+        .add(accEthPerAlloc);
+      expect(await rewardManagerV2.accEthPerAlloc()).to.equal(accEthPerAlloc);
+      currentBlock = await getBlockNumber();
+
+      expect(await rewardManagerV2.lastRewardBlock()).to.equal(currentBlock);
+
+      let poolReward = accEthPerAlloc.mul(protocol1Cover).div(rewardUnit);
+      let accEthPerShare = poolReward.mul(rewardUnit).div(depositAmount);
+
+      pool = await rewardManagerV2.poolInfo(protocol1);
+      expect(pool.totalStaked).to.equal(depositAmount.add(depositAmount2));
+      expect(pool.accEthPerShare).to.equal(accEthPerShare);
+      expect(pool.rewardDebt).to.equal(poolReward);
+
+      userInfo = await rewardManagerV2.userInfo(
+        protocol3,
+        await bob.getAddress()
+      );
+      expect(userInfo.amount).to.equal(depositAmount1);
+      expect(userInfo.rewardDebt).to.equal(0);
+
+      await mineBlocks(50);
+
+      let balanceBefore = await owner.provider.getBalance(
+        await alice.getAddress()
+      );
+
+      let tx = await rewardManagerV2.connect(alice).claimReward(protocol1);
+      currentBlock = await getBlockNumber();
+
+      let receipt = await tx.wait(1);
+      accEthPerAlloc = rewardAmount
+        .div(rewardCycle)
+        .mul(BigNumber.from("51"))
+        .mul(rewardUnit)
+        .div(protocol1Cover.add(protocol2Cover).add(protocol3Cover))
+        .add(accEthPerAlloc);
+      expect(await rewardManagerV2.accEthPerAlloc()).to.equal(accEthPerAlloc);
+
+      let poolDebt = poolReward;
+      poolReward = accEthPerAlloc
+        .mul(protocol1Cover)
+        .div(rewardUnit)
+        .sub(poolDebt);
+      accEthPerShare = poolReward
+        .mul(rewardUnit)
+        .div(depositAmount.add(depositAmount2))
+        .add(accEthPerShare);
+      // expect(await rewardManagerV2.lastRewardBlock()).to.equal(currentBlock);
+      pool = await rewardManagerV2.poolInfo(protocol1);
+      expect(pool.totalStaked).to.equal(depositAmount.add(depositAmount2));
+      expect(pool.accEthPerShare).to.equal(accEthPerShare);
+      expect(pool.rewardDebt).to.equal(poolReward.add(poolDebt));
+
+      let balanceAfter = await owner.provider.getBalance(
+        await alice.getAddress()
+      );
+      expect(balanceAfter.sub(balanceBefore)).to.equal(
+        depositAmount
+          .mul(accEthPerShare)
+          .div(rewardUnit)
+          .sub(receipt.gasUsed.mul(receipt.effectiveGasPrice))
+      );
+      userInfo = await rewardManagerV2.userInfo(
         protocol1,
         await alice.getAddress()
       );

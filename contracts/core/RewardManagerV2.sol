@@ -15,7 +15,16 @@ import "../interfaces/IRewardManagerV2.sol";
  **/
 
 contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
-    event RewardPaid(address indexed user, uint256 reward, uint256 timestamp);
+    /**
+     * @dev Universal requirements:
+     *      - Calculate reward per protocol by totalUsedCover.
+     *      - onlyGov functions must only ever be able to be accessed by governance.
+     *      - Total of refBals must always equal refTotal.
+     *      - depositor should always be address(0) if contract is not locked.
+     *      - totalTokens must always equal pToken.balanceOf( address(this) ) - (refTotal + sum(feesToLiq) ).
+    **/
+
+    event RewardPaid(address indexed user, address indexed protocol, uint256 reward, uint256 timestamp);
     event BalanceAdded(
         address indexed user,
         address indexed protocol,
@@ -34,31 +43,48 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
     );
 
     struct UserInfo {
-        uint256 amount; // How many LP tokens the user has provided.
+        uint256 amount; // How much cover staked
         uint256 rewardDebt; // Reward debt.
     }
     struct PoolInfo {
         address protocol; // Address of protocol contract.
         uint256 totalStaked; // Total staked amount in the pool
-        uint256 allocPoint; // Allocation of protocol.
-        uint256 accEthPerShare; // Accumulated ETHs per share, times 1e12. See below.
+        uint256 allocPoint; // Allocation of protocol - same as totalUsedCover.
+        uint256 accEthPerShare; // Accumulated ETHs per share, times 1e12.
         uint256 rewardDebt; // Pool Reward debt.
     }
 
+    // Total alloc point - sum of totalUsedCover for initialized pools
     uint256 public totalAllocPoint;
+    // Accumlated ETHs per alloc, times 1e12.
     uint256 public accEthPerAlloc;
+    // Last reward updated block
     uint256 public lastRewardBlock;
+    // Reward per block - updates when reward notified
     uint256 public rewardPerBlock;
+    // Time when all reward will be distributed - updates when reward notified
     uint256 public rewardCycleEnd;
+    // Currently used reward in cycle - used to calculate remaining reward at the reward notification
     uint256 public usedReward;
 
+    // reward cycle period
     uint256 public rewardCycle;
+    // last reward amount
     uint256 public lastReward;
 
+    // Reward info for each protocol
     mapping(address => PoolInfo) public poolInfo;
 
+    // Reward info for user in each protocol
     mapping(address => mapping(address => UserInfo)) public userInfo;
 
+    /**
+     * @notice Controller immediately initializes contract with this.
+     * @dev - Must set all included variables properly.
+     *      - Update last reward block as initialized block.
+     * @param _armorMaster Address of ArmorMaster.
+     * @param _rewardCycleBlocks Block amounts in one cycle.
+    **/
     function initialize(address _armorMaster, uint256 _rewardCycleBlocks)
         external
         override
@@ -69,6 +95,13 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         lastRewardBlock = block.number;
     }
 
+    /**
+     * @notice Only BalanceManager can call this function to notify reward.
+     * @dev - Reward must be greater than 0.
+     *      - Must update reward info before notify.
+     *      - Must contain remaining reward of previous cycle
+     *      - Update reward cycle info
+    **/
     function notifyRewardAmount()
         external
         payable
@@ -86,6 +119,11 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         rewardPerBlock = lastReward.div(rewardCycle);
     }
 
+    /**
+     * @notice Update RewardManagerV2 reward information.
+     * @dev - Skip if already updated.
+     *      - Skip if totalAllocPoint is zero or reward not notified yet.
+    **/
     function updateReward() public {
         if (block.number <= lastRewardBlock) {
             return;
@@ -107,6 +145,13 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         lastRewardBlock = block.number;
     }
 
+    /**
+     * @notice Only Plan and Stake manager can call this function.
+     * @dev - Must update reward info before initialize pool.
+     *      - Cannot initlize again.
+     *      - Must update pool rewardDebt and totalAllocPoint.
+     * @param _protocol Protocol address.
+    **/
     function initPool(address _protocol)
         public
         override
@@ -123,6 +168,13 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         pool.rewardDebt = pool.allocPoint.mul(accEthPerAlloc).div(1e12);
     }
 
+    /**
+     * @notice Update alloc point when totalUsedCover updates.
+     * @dev - Only Plan Manager can call this function.
+     *      - Init pool if not initialized.
+     * @param _protocol Protocol address.
+     * @param _allocPoint New allocPoint.
+    **/
     function updateAllocPoint(address _protocol, uint256 _allocPoint)
         external
         override
@@ -141,6 +193,16 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         }
     }
 
+    /**
+     * @notice StakeManager call this function to deposit for user.
+     * @dev - Must update pool info
+     *      - Must give pending reward to user.
+     *      - Emit `BalanceAdded` event.
+     * @param _user User address.
+     * @param _protocol Protocol address.
+     * @param _amount Stake amount.
+     * @param _nftId NftId.
+    **/
     function deposit(
         address _user,
         address _protocol,
@@ -159,7 +221,7 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
                     .mul(pool.accEthPerShare)
                     .div(1e12)
                     .sub(user.rewardDebt);
-                safeRewardTransfer(_user, pending);
+                safeRewardTransfer(_user, _protocol, pending);
             }
         }
         user.amount = user.amount.add(_amount);
@@ -176,6 +238,16 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         );
     }
 
+    /**
+     * @notice StakeManager call this function to withdraw for user.
+     * @dev - Must update pool info
+     *      - Must give pending reward to user.
+     *      - Emit `BalanceWithdrawn` event.
+     * @param _user User address.
+     * @param _protocol Protocol address.
+     * @param _amount Withdraw amount.
+     * @param _nftId NftId.
+    **/
     function withdraw(
         address _user,
         address _protocol,
@@ -190,7 +262,7 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
             user.rewardDebt
         );
         if (pending > 0) {
-            safeRewardTransfer(_user, pending);
+            safeRewardTransfer(_user, _protocol, pending);
         }
         user.amount = user.amount.sub(_amount);
         user.rewardDebt = user.amount.mul(pool.accEthPerShare).div(1e12);
@@ -206,6 +278,12 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         );
     }
 
+    /**
+     * @notice Claim pending reward.
+     * @dev - Must update pool info
+     *      - Emit `RewardPaid` event.
+     * @param _protocol Protocol address.
+    **/
     function claimReward(address _protocol) public {
         PoolInfo storage pool = poolInfo[_protocol];
         UserInfo storage user = userInfo[_protocol][msg.sender];
@@ -216,16 +294,28 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         );
         user.rewardDebt = user.amount.mul(pool.accEthPerShare).div(1e12);
         if (pending > 0) {
-            safeRewardTransfer(msg.sender, pending);
+            safeRewardTransfer(msg.sender, _protocol, pending);
         }
     }
 
+    /**
+     * @notice Claim pending reward of several protocols.
+     * @dev - Must update pool info of each protocol
+     *      - Emit `RewardPaid` event per protocol.
+     * @param _protocols Array of protocol addresses.
+    **/
     function claimRewardInBatch(address[] calldata _protocols) external {
         for (uint256 i = 0; i < _protocols.length; i += 1) {
             claimReward(_protocols[i]);
         }
     }
 
+    /**
+     * @notice Update pool info.
+     * @dev - Skip if already updated.
+     *      - Skip if totalStaked is zero.
+     * @param _protocol Protocol address.
+    **/
     function updatePool(address _protocol) public {
         PoolInfo storage pool = poolInfo[_protocol];
         if (block.number <= lastRewardBlock) {
@@ -245,13 +335,22 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         pool.rewardDebt = pool.allocPoint.mul(accEthPerAlloc).div(1e12);
     }
 
-    function safeRewardTransfer(address _to, uint256 _amount) internal {
+    /**
+     * @notice Check contract balance to avoid tx failure.
+    **/
+    function safeRewardTransfer(address _to, address _protocol, uint256 _amount) internal {
         uint256 reward = Math.min(address(this).balance, _amount);
         payable(_to).transfer(reward);
 
-        emit RewardPaid(_to, reward, block.timestamp);
+        emit RewardPaid(_to, _protocol, reward, block.timestamp);
     }
 
+    /**
+     * @notice Get pending reward amount.
+     * @param _user User address.
+     * @param _protocol Protocol address.
+     * @return pending reward amount
+    **/
     function getPendingReward(address _user, address _protocol)
         public
         view
@@ -283,6 +382,12 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         return user.amount.mul(_accEthPerShare).div(1e12).sub(user.rewardDebt);
     }
 
+    /**
+     * @notice Get pending total reward amount for several protocols.
+     * @param _user User address.
+     * @param _protocols Array of protocol addresses.
+     * @return pending reward amount
+    **/
     function getTotalPendingReward(address _user, address[] memory _protocols)
         external
         view
