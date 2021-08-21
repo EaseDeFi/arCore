@@ -8,6 +8,8 @@ import '../interfaces/IERC20.sol';
 import '../interfaces/IERC721.sol';
 import '../interfaces/IarNFT.sol';
 import '../interfaces/IRewardManager.sol';
+import '../interfaces/IRewardManagerV2.sol';
+import '../interfaces/IBalanceWrapper.sol';
 import '../interfaces/IPlanManager.sol';
 import '../interfaces/IClaimManager.sol';
 import '../interfaces/IStakeManager.sol';
@@ -328,7 +330,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     function _addCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        IRewardManager(getModule("REWARD")).stake(_user, _coverPrice, _nftId);
+        IRewardManagerV2(getModule("REWARDV2")).deposit(_user, _protocol, _coverPrice, _nftId);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
     }
     
@@ -343,7 +345,24 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     function _subtractCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        IRewardManager(getModule("REWARD")).withdraw(_user, _coverPrice, _nftId);
+        uint256 remaining = _coverPrice;
+        address oldRewardModule = getModule("REWARD");
+        if (oldRewardModule != address(0)) {
+            uint256 oldRewardBalance = IBalanceWrapper(oldRewardModule).balanceOf(_user);
+            if (oldRewardBalance > 0) {
+                if (oldRewardBalance <= _coverPrice) {
+                    IRewardManager(oldRewardModule).withdraw(_user, oldRewardBalance, _nftId);
+                    remaining = _coverPrice.sub(oldRewardBalance);
+                } else {
+                    IRewardManager(oldRewardModule).withdraw(_user, _coverPrice, _nftId);
+                    remaining = 0;
+                }
+            }
+        }
+        if (remaining > 0) {
+            IRewardManagerV2(getModule("REWARDV2")).withdraw(_user, _protocol, remaining, _nftId);
+        }
+
         if (!submitted[_nftId]) totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     
