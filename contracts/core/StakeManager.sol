@@ -47,6 +47,9 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     // Track if the NFT was submitted, in which case total staked has already been lowered.
     mapping (uint256 => bool) public submitted;
 
+    // Show NFT migrated status
+    mapping (uint256 => bool) public coverMigrated;
+
     // Event launched when an NFT is staked.
     event StakedNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
 
@@ -332,6 +335,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     {
         IRewardManagerV2(getModule("REWARDV2")).deposit(_user, _protocol, _coverPrice, _nftId);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
+        coverMigrated[_nftId] = true;
     }
     
     /**
@@ -366,6 +370,28 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
         if (!submitted[_nftId]) totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     
+    /**
+     * @dev Migrate reward to V2
+     * @param _nftId Nft id
+    **/
+    function migrateCover(uint256 _nftId)
+      external
+    {
+        require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
+        require(coverMigrated[_nftId] == false, "Already migrated");
+        coverMigrated[_nftId] = true;
+        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, /*uint256 validuntil*/, address scAddress, 
+         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+
+        uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
+
+        address oldRewardModule = getModule("REWARD");
+        uint256 oldRewardBalance = IBalanceWrapper(oldRewardModule).balanceOf(msg.sender);
+        require(oldRewardBalance >= secondPrice, "No reward to migrate");
+        IRewardManager(oldRewardModule).withdraw(msg.sender, secondPrice, _nftId);
+        IRewardManagerV2(getModule("REWARDV2")).deposit(msg.sender, scAddress, secondPrice, _nftId);
+    }
+
     /**
      * @dev Check that the NFT should be allowed to be added. We check expiry and claimInProgress.
      * @param _validUntil The expiration time of this NFT.
