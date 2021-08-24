@@ -372,24 +372,24 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     
     /**
      * @dev Migrate reward to V2
-     * @param _nftId Nft id
+     * @param _nftIds Nft ids
     **/
-    function migrateCover(uint256 _nftId)
+    function migrateCovers(uint256[] memory _nftIds)
       external
     {
-        require(nftOwners[_nftId] == msg.sender, "Sender does not own this NFT.");
-        require(coverMigrated[_nftId] == false, "Already migrated");
-        coverMigrated[_nftId] = true;
-        (/*coverId*/, /*status*/, uint256 sumAssured, uint16 coverPeriod, /*uint256 validuntil*/, address scAddress, 
-         /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftId);
+        for (uint256 i = 0; i < _nftIds.length; i += 1) {
+            address user = nftOwners[_nftIds[i]];
+            require(user != address(0), "NFT not staked");
+            require(coverMigrated[_nftIds[i]] == false, "Already migrated");
+            coverMigrated[_nftIds[i]] = true;
+            (/*coverId*/, /*status*/, /*sumAssured*/, uint16 coverPeriod, /*uint256 validuntil*/, address scAddress, 
+            /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftIds[i]);
 
-        uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
+            uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
 
-        address oldRewardModule = getModule("REWARD");
-        uint256 oldRewardBalance = IBalanceWrapper(oldRewardModule).balanceOf(msg.sender);
-        require(oldRewardBalance >= secondPrice, "No reward to migrate");
-        IRewardManager(oldRewardModule).withdraw(msg.sender, secondPrice, _nftId);
-        IRewardManagerV2(getModule("REWARDV2")).deposit(msg.sender, scAddress, secondPrice, _nftId);
+            IRewardManager(getModule("REWARD")).withdraw(user, secondPrice, _nftIds[i]);
+            IRewardManagerV2(getModule("REWARDV2")).deposit(user, scAddress, secondPrice, _nftIds[i]);
+        }
     }
 
     /**
