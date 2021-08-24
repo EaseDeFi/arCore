@@ -11,4 +11,8 @@ contract RewardManagerMock {
     function withdraw(address _user, uint256 _amount, uint256 _nftId) external {
         stakes[_user] -= _amount;
     }
+
+    function balanceOf(address _user) external view returns (uint256) {
+        return stakes[_user];
+    }
 }

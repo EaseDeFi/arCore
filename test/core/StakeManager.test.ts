@@ -11,6 +11,7 @@ describe("StakeManager", function () {
   let accounts: Signer[];
   let master: Contract;
   let rewardManager: Contract;
+  let rewardManagerV2: Contract;
   let planManager: Contract;
   let balanceManager: Contract;
   let claimManager: Contract;
@@ -22,6 +23,9 @@ describe("StakeManager", function () {
   let owner: Signer;
   let user: Signer;
   let dev: Signer;
+
+  const rewardCycle = BigNumber.from("8640"); // 1 day
+
   beforeEach(async function () {
     accounts = await ethers.getSigners();
     owner = accounts[0];
@@ -51,7 +55,11 @@ describe("StakeManager", function () {
     const RewardFactory = await ethers.getContractFactory("RewardManagerMock");
     rewardManager = await RewardFactory.deploy();
     await master.connect(owner).registerModule(stringToBytes32("REWARD"), rewardManager.address);
-    
+    const RewardV2Factory = await ethers.getContractFactory("RewardManagerV2");
+    rewardManagerV2 = await RewardV2Factory.deploy();
+    await rewardManagerV2.initialize(master.address, rewardCycle);
+    await master.connect(owner).registerModule(stringToBytes32("REWARDV2"), rewardManagerV2.address);
+
     const ClaimFactory = await ethers.getContractFactory("ClaimManagerMock");
     claimManager = await ClaimFactory.deploy();
     await master.connect(owner).registerModule(stringToBytes32("CLAIM"), claimManager.address);
