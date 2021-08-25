@@ -132,6 +132,7 @@ describe("StakeManager", function () {
     });
     it("should be able to stake valid nft", async function(){
       await expect(stakeManager.connect(user).stakeNft(1)).to.emit(stakeManager, 'StakedNFT');
+      expect(await stakeManager.coverMigrated(1)).to.equal(true);
     });
     it("should set valid nftCoverPrice", async function(){
       await expect(stakeManager.connect(user).stakeNft(1)).to.emit(stakeManager, 'StakedNFT');
@@ -198,6 +199,68 @@ describe("StakeManager", function () {
       await balanceManager.setBalance(await user.getAddress(), userBalance);
       await planManager.connect(user).updatePlan([arNFT.address], [1]);
       await expect(stakeManager.connect(user).withdrawNft(1)).to.be.revertedWith("May not withdraw NFT if it will bring staked amount below borrowed amount.");
+    });
+  });
+
+  describe("#migrateCovers()", function(){
+    beforeEach(async function(){
+      const StakeTestFactory = await ethers.getContractFactory("StakeManagerTest");
+      stakeManager = await StakeTestFactory.deploy();
+      await stakeManager.connect(owner).initialize(master.address);
+      await master.connect(owner).registerModule(stringToBytes32("STAKE"), stakeManager.address);
+
+      const details = [BigNumber.from(100), BigNumber.from("1000000000000000000"), BigNumber.from(1000), BigNumber.from(10000000), BigNumber.from(1)];
+      await stakeManager.connect(owner).allowProtocol(arNFT.address, true);
+      await arNFT.connect(user).buyCover(
+        arNFT.address,
+        "0x45544800",
+        details,
+        100,
+        0,
+        ethers.utils.randomBytes(32),
+        ethers.utils.randomBytes(32)
+      );
+      await arNFT.connect(user).buyCover(
+        arNFT.address,
+        "0x45544800",
+        details,
+        100,
+        0,
+        ethers.utils.randomBytes(32),
+        ethers.utils.randomBytes(32)
+      );
+      await arNFT.connect(user).approve(stakeManager.address, 1);
+      await stakeManager.connect(user).stakeNft(1);
+    });
+    it("should fail if not staked", async function() {
+      await expect(stakeManager.connect(user).migrateCovers([2])).to.be.revertedWith("NFT not staked.");
+    });
+    it("should migrate cover from v1 to v2", async function() {
+      const userInfoBefore = await rewardManagerV2.userInfo(arNFT.address, await user.getAddress())
+      expect(userInfoBefore.amount).to.equal(BigNumber.from("1000000000000000000").div(86400 * 100));
+
+      // simulate
+      await stakeManager.forceCoverMigrated(1, false);
+      await rewardManager.stake(await user.getAddress(), BigNumber.from("1000000000000000000").div(86400 * 100), 1);
+      expect(await stakeManager.coverMigrated(1)).to.equal(false);
+
+      // test migrate
+      await stakeManager.migrateCovers([1]);
+      const userInfoAfter = await rewardManagerV2.userInfo(arNFT.address, await user.getAddress())
+      expect(userInfoAfter.amount).to.equal(userInfoBefore.amount.add(BigNumber.from("1000000000000000000").div(86400 * 100)));
+      expect(await stakeManager.coverMigrated(1)).to.equal(true);
+      expect(await rewardManager.balanceOf(await user.getAddress())).to.equal(0);
+    });
+    it("should fail if already migrated", async function() {
+      // simulate
+      await stakeManager.forceCoverMigrated(1, false);
+      await rewardManager.stake(await user.getAddress(), BigNumber.from("1000000000000000000").div(86400 * 100), 1);
+      expect(await stakeManager.coverMigrated(1)).to.equal(false);
+
+      // test migrate
+      await stakeManager.migrateCovers([1]);
+
+      await expect(stakeManager.connect(user).migrateCovers([1])).to.be.revertedWith("Already migrated.");
     });
   });
 });
