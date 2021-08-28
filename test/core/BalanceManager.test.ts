@@ -228,7 +228,7 @@ describe("BalanceManager", function () {
         await balanceManager.connect(owner).releaseFunds();
       });
       
-      it.only('should manual update', async function(){
+      it('should manual update', async function(){
         await balanceManager.changeKeeper(user.getAddress());
         await balanceManager.connect(dev).deposit(await referrer.getAddress(), {value:amount});
         await planManager.mockChangePrice(balanceManager.address, await dev.getAddress(),amount.div(1000));

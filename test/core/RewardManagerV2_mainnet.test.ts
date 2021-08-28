@@ -120,7 +120,7 @@ describe("RewardManagerV2 Mainnet Fork", function () {
       expect(userInfo.amount).to.equal(coverPrice);
     });
 
-    it("should withdraw from rewardV2 when withdrawNft", async function () {
+    it.only("should withdraw from rewardV2 when withdrawNft", async function () {
       // Allow user
       const userAddress = "0x09fa38eba245bb68354b8950fa2fe71f02863393";
       const protocol = "0x0000000000000000000000000000000000000001";
@@ -136,6 +136,7 @@ describe("RewardManagerV2 Mainnet Fork", function () {
         "StakeManager"
       );
       await stakeManager.connect(user).stakeNft(5238);
+      expect(await stakeManager.coverMigrated(5238)).to.equal(true);
       await stakeManager.connect(user).withdrawNft(5238);
       const userInfo = await rewardManagerV2.userInfo(protocol, userAddress);
       expect(userInfo.amount).to.equal(0);

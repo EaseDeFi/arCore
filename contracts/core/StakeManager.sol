@@ -47,6 +47,9 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     // Track if the NFT was submitted, in which case total staked has already been lowered.
     mapping (uint256 => bool) public submitted;
 
+    // Show NFT migrated status
+    mapping (uint256 => bool) public coverMigrated;
+
     // Event launched when an NFT is staked.
     event StakedNFT(address indexed user, address indexed protocol, uint256 nftId, uint256 sumAssured, uint256 secondPrice, uint16 coverPeriod, uint256 timestamp);
 
@@ -332,6 +335,7 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     {
         IRewardManagerV2(getModule("REWARDV2")).deposit(_user, _protocol, _coverPrice, _nftId);
         totalStakedAmount[_protocol] = totalStakedAmount[_protocol].add(_coverAmount);
+        coverMigrated[_nftId] = true;
     }
     
     /**
@@ -345,27 +349,37 @@ contract StakeManager is ArmorModule, ExpireTracker, IStakeManager {
     function _subtractCovers(address _user, uint256 _nftId, uint256 _coverAmount, uint256 _coverPrice, address _protocol)
       internal
     {
-        uint256 remaining = _coverPrice;
-        address oldRewardModule = getModule("REWARD");
-        if (oldRewardModule != address(0)) {
-            uint256 oldRewardBalance = IBalanceWrapper(oldRewardModule).balanceOf(_user);
-            if (oldRewardBalance > 0) {
-                if (oldRewardBalance <= _coverPrice) {
-                    IRewardManager(oldRewardModule).withdraw(_user, oldRewardBalance, _nftId);
-                    remaining = _coverPrice.sub(oldRewardBalance);
-                } else {
-                    IRewardManager(oldRewardModule).withdraw(_user, _coverPrice, _nftId);
-                    remaining = 0;
-                }
-            }
-        }
-        if (remaining > 0) {
-            IRewardManagerV2(getModule("REWARDV2")).withdraw(_user, _protocol, remaining, _nftId);
+        if (coverMigrated[_nftId]) {
+            IRewardManagerV2(getModule("REWARDV2")).withdraw(_user, _protocol, _coverPrice, _nftId);
+        } else {
+            IRewardManager(getModule("REWARD")).withdraw(_user, _coverPrice, _nftId);
         }
 
         if (!submitted[_nftId]) totalStakedAmount[_protocol] = totalStakedAmount[_protocol].sub(_coverAmount);
     }
     
+    /**
+     * @dev Migrate reward to V2
+     * @param _nftIds Nft ids
+    **/
+    function migrateCovers(uint256[] calldata _nftIds)
+      external
+    {
+        for (uint256 i = 0; i < _nftIds.length; i += 1) {
+            address user = nftOwners[_nftIds[i]];
+            require(user != address(0), "NFT not staked.");
+            require(coverMigrated[_nftIds[i]] == false, "Already migrated.");
+            coverMigrated[_nftIds[i]] = true;
+            (/*coverId*/, /*status*/, /*sumAssured*/, uint16 coverPeriod, /*uint256 validuntil*/, address scAddress, 
+            /*coverCurrency*/, /*premiumNXM*/, uint256 coverPrice, /*claimId*/) = IarNFT(getModule("ARNFT")).getToken(_nftIds[i]);
+
+            uint256 secondPrice = coverPrice / (uint256(coverPeriod) * 1 days);
+
+            IRewardManager(getModule("REWARD")).withdraw(user, secondPrice, _nftIds[i]);
+            IRewardManagerV2(getModule("REWARDV2")).deposit(user, scAddress, secondPrice, _nftIds[i]);
+        }
+    }
+
     /**
      * @dev Check that the NFT should be allowed to be added. We check expiry and claimInProgress.
      * @param _validUntil The expiration time of this NFT.
