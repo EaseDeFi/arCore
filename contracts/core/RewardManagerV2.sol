@@ -129,7 +129,7 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
             return;
         }
 
-        if (rewardCycleEnd == 0 || totalAllocPoint == 0) {
+        if (rewardCycleEnd == 0 || totalAllocPoint == 0 || lastRewardBlock > rewardCycleEnd) {
             lastRewardBlock = block.number;
             return;
         }
@@ -356,7 +356,7 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
         view
         returns (uint256)
     {
-        if (rewardCycleEnd == 0 || totalAllocPoint == 0) {
+        if (rewardCycleEnd == 0 || totalAllocPoint == 0 || lastRewardBlock > rewardCycleEnd) {
             return 0;
         }
 
