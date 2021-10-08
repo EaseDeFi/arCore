@@ -134,7 +134,7 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
             return;
         }
 
-        uint256 reward = Math
+        uint256 reward = rewardCycleEnd <= lastRewardBlock ? 0 : Math
             .min(rewardCycleEnd, block.number)
             .sub(lastRewardBlock)
             .mul(rewardPerBlock);
@@ -318,9 +318,6 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
     **/
     function updatePool(address _protocol) public {
         PoolInfo storage pool = poolInfo[_protocol];
-        if (block.number <= lastRewardBlock) {
-            return;
-        }
         if (pool.totalStaked == 0) {
             return;
         }
@@ -360,7 +357,7 @@ contract RewardManagerV2 is BalanceWrapper, ArmorModule, IRewardManagerV2 {
             return 0;
         }
 
-        uint256 reward = Math
+        uint256 reward = rewardCycleEnd <= lastRewardBlock ? 0 : Math
             .min(rewardCycleEnd, block.number)
             .sub(lastRewardBlock)
             .mul(rewardPerBlock);
