@@ -108,7 +108,7 @@ contract FarmController is Ownable {
         uint256 cacheBorrowerReward = borrowerRewards;
         IRewardDistributionRecipientTokenOnly borrowerFarm = IRewardDistributionRecipientTokenOnly(borrowerReward);
         rewardToken.approve(address(borrowerFarm), cacheBorrowerReward);
-        stakerFarm.notifyRewardAmount(cacheBorrowerReward);
+        borrowerFarm.notifyRewardAmount(cacheBorrowerReward);
 
         lastRewardDistributed += 7 days;
     }
