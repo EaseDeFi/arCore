@@ -11,6 +11,13 @@ import "../general/SafeERC20.sol";
 contract FarmController is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    
+    // constant does not occupy the storage slot
+    address public constant stakerReward = 0x1337DEF1B1Ae35314b40e5A4b70e216A499b0E37;
+
+    address public constant borrowerReward = 0x1337DEF172152f2fF82d9545Fd6f79fE38dF15ce;
+
+    uint256 public constant INITIAL_DISTRIBUTED = 1638082800;
 
     IRewardDistributionRecipientTokenOnly[] public farms;
     mapping(address => address) public lpFarm;
@@ -19,6 +26,15 @@ contract FarmController is Ownable {
     IERC20 public rewardToken;
 
     mapping(address => bool) public blackListed;
+
+    // rewards
+    uint256 public lastRewardDistributed;
+
+    uint256 public lpRewards;
+
+    uint256 public stakerRewards;
+
+    uint256 public borrowerRewards;
 
     function initialize(address token) external {
         Ownable.initializeOwnable();
@@ -55,12 +71,46 @@ contract FarmController is Ownable {
         rate[_farm] = _rate;
     }
 
-    function notifyRewards(uint256 amount) external onlyOwner {
-        rewardToken.transferFrom(msg.sender, address(this), amount);
-        for(uint256 i = 0; i<farms.length; i++){
-            IRewardDistributionRecipientTokenOnly farm = farms[i];
-            farm.notifyRewardAmount(amount.mul(rate[address(farm)]).div(weightSum));
+    function setRewards(uint256 _lpRewards, uint256 _stakerRewards, uint256 _borrowerRewards) external onlyOwner {
+        // deposit armor before this
+        lpRewards = _lpRewards;
+        stakerRewards = _stakerRewards;
+        borrowerRewards = _borrowerRewards;
+    }
+
+    function withdrawToken(address _token) external onlyOwner {
+        //withdraw can disable the rewards
+        IERC20(_token).transfer(msg.sender, IERC20(_token).balanceOf(address(this)));
+    }
+
+    function initializeRewardDistribution() external onlyOwner {
+        require(lastRewardDistributed > 0, "initialized");
+        lastRewardDistributed = INITIAL_DISTRIBUTED;
+    }
+
+    function flushRewards() external {
+        require(block.timestamp >= lastRewardDistributed + 7 days, "wait");
+        IRewardDistributionRecipientTokenOnly[] memory lpFarms = farms;
+        uint256 cacheLpReward = lpRewards;
+        uint256 cacheSum = weightSum;
+        for(uint256 i = 0; i<lpFarms.length; i++){
+            IRewardDistributionRecipientTokenOnly farm = lpFarms[i];
+            uint256 amount = cacheLpReward.mul(rate[address(farm)]).div(cacheSum);
+            rewardToken.approve(address(farm), amount);
+            farm.notifyRewardAmount(amount);
         }
+
+        uint256 cacheStakerReward = stakerRewards;
+        IRewardDistributionRecipientTokenOnly stakerFarm = IRewardDistributionRecipientTokenOnly(stakerReward);
+        rewardToken.approve(address(stakerFarm), cacheStakerReward);
+        stakerFarm.notifyRewardAmount(cacheStakerReward);
+        
+        uint256 cacheBorrowerReward = borrowerRewards;
+        IRewardDistributionRecipientTokenOnly borrowerFarm = IRewardDistributionRecipientTokenOnly(borrowerReward);
+        rewardToken.approve(address(borrowerFarm), cacheBorrowerReward);
+        stakerFarm.notifyRewardAmount(cacheBorrowerReward);
+
+        lastRewardDistributed += 7 days;
     }
 
     // should transfer rewardToken prior to calling this contract
