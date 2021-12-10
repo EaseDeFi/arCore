@@ -1,7 +1,8 @@
 import { network, ethers } from "hardhat";
 import { providers, Contract, Signer, BigNumber, utils } from "ethers";
 import { expect } from "chai";
-import { increase, getTimestamp } from './utils';
+import { mine, increase, getTimestamp } from './utils';
+
 const multisig_mainnet = "0x1f28ed9d4792a567dad779235c2b766ab84d8e33";
 const controller_mainnet = "0x1337DEF159da6F97dB7c4D0E257dc689837b9E70";
 const staker_mainnet = "0x1337DEF1B1Ae35314b40e5A4b70e216A499b0E37";
@@ -26,6 +27,7 @@ describe.only('fork', function(){
     const template  = await NewTemplate.deploy();
     await proxy.connect(multisig).upgradeTo(template.address);
     farmController = await ethers.getContractAt("FarmController", proxy.address);
+    await farmController.connect(multisig).initializeRewardDistribution();
     stakerFarm = await ethers.getContractAt("UtilizationFarm", staker_mainnet);
     borrowerFarm = await ethers.getContractAt("UtilizationFarm", borrower_mainnet);
     token = await ethers.getContractAt("contracts/interfaces/IERC20.sol:IERC20", token_mainnet);
@@ -34,6 +36,10 @@ describe.only('fork', function(){
   });
 
   it.only('changeProtocol - stakeManual', async function() {
+    console.log((await getTimestamp()).toString());
+    await increase( 3* 86400 + 3 * 60 * 60);
+    await mine();
+    console.log((await getTimestamp()).toString());
     await farmController.connect(multisig).setRewards("10000", "100", "1");
     await token.connect(multisig).transfer(farmController.address, "10101");
     const beforeBalance = {
@@ -48,5 +54,6 @@ describe.only('fork', function(){
 
     expect(afterBalance.staker).to.equal(beforeBalance.staker.add(100));
     expect(afterBalance.borrower).to.equal(beforeBalance.borrower.add(1));
+    console.log((await farmController.lastRewardDistributed()).toString());
   });
 });
