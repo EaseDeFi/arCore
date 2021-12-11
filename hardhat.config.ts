@@ -1,9 +1,19 @@
+import { task } from "hardhat/config";
 import "@nomiclabs/hardhat-waffle";
 import "solidity-coverage";
 import "hardhat-spdx-license-identifier";
 import "hardhat-gas-reporter";
+import { manualUpdate } from "./scripts/manualUpdate";
+import axios from "axios";
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
+
+task("keep-balance", "Runs balance manager keeper")
+  .addParam("threshold", "threshold to call keep, enter eth amount (ex. 0.5 eth => 0.5)")
+  .setAction(
+    async(taskArgs, hre) => {
+      await manualUpdate(hre, taskArgs.threshold);
+    });
 
 export default {
   gasReporter: {
@@ -47,7 +57,7 @@ export default {
       timeout: 1000000,
       forking: {
         url: "https://eth-mainnet.alchemyapi.io/v2/90dtUWHmLmwbYpvIeC53UpAICALKyoIu",
-        blockNumber: 13769255
+        blockNumber: 13581728
       }
     },
     coverage: {

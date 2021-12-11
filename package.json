@@ -17,6 +17,7 @@
   "license": "(c) Armor.Fi DAO, 2021",
   "dependencies": {
     "@openzeppelin/contracts": "^3.2.0",
+    "axios": "^0.24.0",
     "bignumber.js": "9.0.1",
     "dotenv": "^10.0.0",
     "ethereumjs-util": "7.0.5",
