@@ -17,7 +17,7 @@ contract FarmController is Ownable {
 
     address public constant borrowerReward = 0x1337DEF172152f2fF82d9545Fd6f79fE38dF15ce;
 
-    uint256 public constant INITIAL_DISTRIBUTED = 1638082800;
+    uint256 public constant INITIAL_DISTRIBUTED = 1638687600;
 
     IRewardDistributionRecipientTokenOnly[] public farms;
     mapping(address => address) public lpFarm;
@@ -84,7 +84,7 @@ contract FarmController is Ownable {
     }
 
     function initializeRewardDistribution() external onlyOwner {
-        require(lastRewardDistributed > 0, "initialized");
+        require(lastRewardDistributed == 0, "initialized");
         lastRewardDistributed = INITIAL_DISTRIBUTED;
     }
 
@@ -96,21 +96,30 @@ contract FarmController is Ownable {
         for(uint256 i = 0; i<lpFarms.length; i++){
             IRewardDistributionRecipientTokenOnly farm = lpFarms[i];
             uint256 amount = cacheLpReward.mul(rate[address(farm)]).div(cacheSum);
-            rewardToken.approve(address(farm), amount);
-            farm.notifyRewardAmount(amount);
+            if(amount > 0) {
+                rewardToken.approve(address(farm), amount);
+                farm.notifyRewardAmount(amount);
+            }
         }
 
         uint256 cacheStakerReward = stakerRewards;
-        IRewardDistributionRecipientTokenOnly stakerFarm = IRewardDistributionRecipientTokenOnly(stakerReward);
-        rewardToken.approve(address(stakerFarm), cacheStakerReward);
-        stakerFarm.notifyRewardAmount(cacheStakerReward);
+        if(cacheStakerReward > 0) {
+            IRewardDistributionRecipientTokenOnly stakerFarm = IRewardDistributionRecipientTokenOnly(stakerReward);
+            rewardToken.approve(address(stakerFarm), cacheStakerReward);
+            stakerFarm.notifyRewardAmount(cacheStakerReward);
+        }
         
         uint256 cacheBorrowerReward = borrowerRewards;
-        IRewardDistributionRecipientTokenOnly borrowerFarm = IRewardDistributionRecipientTokenOnly(borrowerReward);
-        rewardToken.approve(address(borrowerFarm), cacheBorrowerReward);
-        stakerFarm.notifyRewardAmount(cacheBorrowerReward);
+        if(cacheBorrowerReward > 0) {
+            IRewardDistributionRecipientTokenOnly borrowerFarm = IRewardDistributionRecipientTokenOnly(borrowerReward);
+            rewardToken.approve(address(borrowerFarm), cacheBorrowerReward);
+            borrowerFarm.notifyRewardAmount(cacheBorrowerReward);
+        }
 
-        lastRewardDistributed += 7 days;
+        // this will make sure lastRewardDistributed to set in order
+        while(block.timestamp - lastRewardDistributed > 7 days) {
+            lastRewardDistributed += 7 days;
+        }
     }
 
     // should transfer rewardToken prior to calling this contract

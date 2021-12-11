@@ -120,7 +120,7 @@ describe("RewardManagerV2 Mainnet Fork", function () {
       expect(userInfo.amount).to.equal(coverPrice);
     });
 
-    it.only("should withdraw from rewardV2 when withdrawNft", async function () {
+    it("should withdraw from rewardV2 when withdrawNft", async function () {
       // Allow user
       const userAddress = "0x09fa38eba245bb68354b8950fa2fe71f02863393";
       const protocol = "0x0000000000000000000000000000000000000001";
